@@ -1,0 +1,66 @@
+schemaVersion: "1.0"
+project:
+  title: "雾城来信"
+  sourceLanguage: "zh-CN"
+  format: "web_series"
+  sourceChapterCount: 3
+characters:
+  - id: "char_001"
+    name: "林舟"
+    description: "克制而敏感的记者"
+    age: "28"
+    gender: "男"
+    clothing: "深色防雨外套"
+    visualWeight: 5
+    firstAppearance: "chapter_01"
+  - id: "char_002"
+    name: "苏禾"
+    description: "掌握旧案资料的档案员"
+    age: "30"
+    gender: "女"
+    clothing: "简洁的灰色衬衫"
+    visualWeight: 4
+    firstAppearance: "chapter_01"
+locations:
+  - id: "loc_001"
+    name: "旧城咖啡馆"
+    description: "雨夜中仍亮着灯的老咖啡馆"
+    timeOfDay: "NIGHT"
+    lightingMood: "暖色室内灯与窗外冷雨形成反差"
+    visualWeight: 4
+props:
+  - id: "prop_001"
+    name: "神秘来信"
+    description: "没有寄件人的旧信"
+    storyFunction: "引出失踪旧案"
+    firstAppearance: "chapter_01"
+scenes:
+  - id: "scene_001"
+    sourceChapterIds: ["chapter_01"]
+    heading:
+      setting: "INT"
+      location: "旧城咖啡馆"
+      time: "NIGHT"
+    purpose: "林舟取得神秘来信并见到苏禾"
+    characters: ["char_001", "char_002"]
+    props: ["prop_001"]
+    beats:
+      - id: "beat_001_01"
+        type: "action"
+        text: "林舟推门进入咖啡馆，雨水顺着外套滴落。"
+      - id: "beat_001_02"
+        type: "dialogue"
+        characterId: "char_001"
+        parenthetical: "低声"
+        text: "我来取那封没有寄件人的信。"
+    continuity:
+      previousSceneId: null
+      nextSceneId: "scene_002"
+    sourceFidelity:
+      confidence: 0.91
+      inventedContent: false
+      evidence: "林舟在雨夜进入咖啡馆取信。"
+adaptationNotes:
+  - sceneId: "scene_001"
+    type: "compression"
+    description: "合并了原文中重复的环境描写。"

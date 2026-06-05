@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: novel-screenplay
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8088
+
+logging:
+  level:
+    com.example.screenplay: INFO
+
+screenplay:
+  ai:
+    enabled: ${SCREENPLAY_AI_ENABLED:false}
+    base-url: ${SCREENPLAY_AI_BASE_URL:https://api.deepseek.com}
+    api-key: ${SCREENPLAY_AI_API_KEY:}
+    model: ${SCREENPLAY_AI_MODEL:deepseek-v4-flash}
+    timeout-seconds: ${SCREENPLAY_AI_TIMEOUT_SECONDS:180}

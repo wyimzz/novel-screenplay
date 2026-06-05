@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>镜页 - 小说转剧本工作台</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="app-header">
+  <div class="brand-block">
+    <div class="brand-mark">镜</div>
+    <div>
+      <strong>镜页</strong>
+      <span>小说转剧本工作台</span>
+    </div>
+  </div>
+  <div class="header-actions">
+    <div id="runtimeStatus" class="runtime-status"><span></span><b>正在读取 AI 设置</b></div>
+    <button id="aiSettingsBtn" class="settings-button" type="button" title="AI 设置">AI 设置</button>
+  </div>
+</header>
+
+<main class="workspace">
+  <aside class="source-panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">SOURCE</p>
+        <h1>小说原文</h1>
+      </div>
+      <button id="sampleBtn" class="button button-muted" type="button">载入示例</button>
+    </div>
+
+    <div class="fields">
+      <label>
+        <span>作品名称</span>
+        <input id="title" value="雾城来信" placeholder="输入作品名称">
+      </label>
+      <label>
+        <span>剧本形式</span>
+        <select id="format">
+          <option value="web_series">短剧</option>
+          <option value="film">电影</option>
+          <option value="tv_series">电视剧</option>
+          <option value="stage_play">舞台剧</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="novel-field">
+      <span>正文内容</span>
+      <textarea id="content" spellcheck="false"
+                placeholder="粘贴至少 3 个章节，章节标题使用“第一章”或“Chapter 1”"></textarea>
+    </label>
+
+    <div class="source-footer">
+      <div id="chapterHint">等待输入章节</div>
+      <button id="convertBtn" class="button button-primary" type="button">开始改编</button>
+    </div>
+  </aside>
+
+  <section class="studio-panel">
+    <nav class="pipeline" aria-label="改编流程">
+      <div class="pipeline-step active" data-stage="source"><b>1</b><span>章节解析</span></div>
+      <div class="pipeline-line"></div>
+      <div class="pipeline-step" data-stage="assets"><b>2</b><span>故事圣经</span></div>
+      <div class="pipeline-line"></div>
+      <div class="pipeline-step" data-stage="scenes"><b>3</b><span>场景拆解</span></div>
+      <div class="pipeline-line"></div>
+      <div class="pipeline-step" data-stage="yaml"><b>4</b><span>Schema 校验</span></div>
+    </nav>
+
+    <div class="studio-heading">
+      <div>
+        <p class="eyebrow">ADAPTATION STUDIO</p>
+        <h2 id="projectTitle">尚未生成剧本</h2>
+      </div>
+      <div class="studio-actions">
+        <button id="editBtn" class="button button-muted" type="button" disabled>编辑结构</button>
+        <button id="downloadBtn" class="button button-download" type="button" disabled title="下载 YAML">
+          下载 YAML
+        </button>
+      </div>
+    </div>
+
+    <div id="emptyState" class="empty-state">
+      <div class="empty-symbol">三幕</div>
+      <strong>从小说建立可编辑的剧本结构</strong>
+      <p>系统会先提取人物、地点和道具，再拆分场景并输出符合 Schema 的 YAML。</p>
+    </div>
+
+    <div id="resultArea" class="result-area hidden">
+      <div id="validation" class="validation"></div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" type="button" data-tab="assets">故事圣经</button>
+        <button class="tab" type="button" data-tab="scenes">场景拆解</button>
+        <button class="tab" type="button" data-tab="yaml">YAML</button>
+      </div>
+
+      <div id="assetsView" class="tab-view">
+        <div id="metrics" class="metrics"></div>
+        <div class="asset-section">
+          <div class="section-label"><h3>人物</h3><span id="characterCount">0</span></div>
+          <div id="characters" class="asset-grid"></div>
+        </div>
+        <div class="asset-section">
+          <div class="section-label"><h3>地点</h3><span id="locationCount">0</span></div>
+          <div id="locations" class="asset-grid"></div>
+        </div>
+        <div class="asset-section">
+          <div class="section-label"><h3>关键道具</h3><span id="propCount">0</span></div>
+          <div id="props" class="asset-grid"></div>
+        </div>
+      </div>
+
+      <div id="scenesView" class="tab-view hidden">
+        <div id="scenes" class="scene-list"></div>
+      </div>
+
+      <div id="yamlView" class="tab-view hidden">
+        <pre id="output"></pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="settingsDialog" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <section class="settings-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">MODEL SETTINGS</p>
+        <h2 id="settingsTitle">AI 模型设置</h2>
+      </div>
+      <button id="closeSettingsBtn" class="close-button" type="button" title="关闭">×</button>
+    </div>
+
+    <div class="mode-control">
+      <button class="mode-option" type="button" data-mode="offline">
+        <strong>离线规则</strong>
+        <span>无需 API，适合演示结构</span>
+      </button>
+      <button class="mode-option active" type="button" data-mode="deepseek">
+        <strong>DeepSeek</strong>
+        <span>使用大模型完成真实改编</span>
+      </button>
+    </div>
+
+    <div id="aiFields" class="settings-fields">
+      <label>
+        <span>API 地址</span>
+        <input id="aiBaseUrl" value="https://api.deepseek.com">
+      </label>
+      <label>
+        <span>模型</span>
+        <select id="aiModel">
+            <option value="deepseek-v4-flash">deepseek-v4-flash（速度优先）</option>
+            <option value="deepseek-v4-pro">deepseek-v4-pro（质量优先）</option>
+            <option value="deepseek-chat">deepseek-chat（兼容模型）</option>
+        </select>
+      </label>
+      <label>
+        <span>API Key</span>
+        <input id="aiApiKey" type="password" autocomplete="new-password"
+               placeholder="输入新 Key；留空则保留已配置的 Key">
+        <small id="apiKeyHint">尚未配置</small>
+      </label>
+      <label>
+        <span>请求超时</span>
+        <div class="number-field">
+          <input id="aiTimeout" type="number" min="10" max="600" value="180">
+          <span>秒</span>
+        </div>
+      </label>
+    </div>
+
+    <div id="connectionResult" class="connection-result hidden"></div>
+    <div class="dialog-actions">
+      <button id="testAiBtn" class="button button-muted" type="button">测试连接</button>
+      <button id="saveAiBtn" class="button button-primary" type="button">保存设置</button>
+    </div>
+  </section>
+</div>
+
+<div id="editorDialog" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+  <section class="settings-dialog screenplay-editor-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">STRUCTURED DRAFT</p>
+        <h2 id="editorTitle">剧本块编辑器</h2>
+      </div>
+      <button id="closeEditorBtn" class="close-button" type="button" title="关闭">×</button>
+    </div>
+    <p class="editor-help">逐场修改场景信息、动作与对白。保存时会重新编号、校验引用并生成 YAML。</p>
+    <div class="block-editor">
+      <aside class="editor-scenes">
+        <div class="editor-section-heading">
+          <strong>场景</strong>
+          <button id="addSceneBtn" class="icon-button" type="button" title="新增场景">＋</button>
+        </div>
+        <div id="editorSceneList" class="editor-scene-list"></div>
+      </aside>
+      <section class="editor-detail">
+        <div class="editor-grid">
+          <label>
+            <span>场景目的</span>
+            <input id="editScenePurpose" placeholder="本场承担的冲突、揭示或人物变化">
+          </label>
+          <label>
+            <span>来源章节</span>
+            <input id="editSceneChapters" placeholder="chapter_01">
+          </label>
+          <label>
+            <span>内 / 外景</span>
+            <select id="editSceneSetting">
+              <option value="INT">INT 内景</option>
+              <option value="EXT">EXT 外景</option>
+              <option value="INT/EXT">INT/EXT 内外景</option>
+            </select>
+          </label>
+          <label>
+            <span>地点</span>
+            <input id="editSceneLocation" placeholder="场景地点">
+          </label>
+          <label>
+            <span>时间</span>
+            <select id="editSceneTime">
+              <option value="DAWN">黎明</option>
+              <option value="DAY">日间</option>
+              <option value="DUSK">黄昏</option>
+              <option value="NIGHT">夜晚</option>
+              <option value="CONTINUOUS">连续</option>
+              <option value="UNKNOWN">未确定</option>
+            </select>
+          </label>
+        </div>
+        <div class="editor-beat-heading">
+          <div>
+            <strong>动作与对白</strong>
+            <span id="editorBeatCount">0 个叙事单元</span>
+          </div>
+          <button id="addBeatBtn" class="button button-muted" type="button">新增 Beat</button>
+        </div>
+        <div id="editorBeats" class="editor-beats"></div>
+        <button id="deleteSceneBtn" class="danger-button" type="button">删除当前场景</button>
+      </section>
+    </div>
+    <div id="editorResult" class="connection-result hidden"></div>
+    <div class="dialog-actions">
+      <span class="editor-save-note">修改保存在当前草稿中，点击应用后同步 YAML。</span>
+      <button id="applyEditBtn" class="button button-primary" type="button">应用修改</button>
+    </div>
+  </section>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
