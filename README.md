@@ -64,6 +64,7 @@ powershell -ExecutionPolicy Bypass -File .\run-deepseek.ps1 -Port 8090
 - DeepSeek 分阶段生成：Story Bible -> 全书改编蓝图 -> 分章详细剧本 -> 全局合并
 - AI 服务商切换：DeepSeek、智谱 GLM、通义千问、Moonshot/Kimi、OpenAI、Ollama 与自定义兼容接口
 - 模型 ID 可自由编辑，预设仅用于快速填写，不限制厂商新增模型
+- 剧本形式采用不同媒介规格：电影三幕长片、电视剧四幕单集、短剧强钩子高反转、舞台剧有限换景与演员调度
 - 后台生成任务与真实阶段进度，刷新页面请求不会长期占用单个 HTTP 连接
 - AI JSON 异常时自动截取有效对象并执行一次结构修复
 - 人物、地点、道具稳定 ID

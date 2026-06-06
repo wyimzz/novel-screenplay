@@ -315,8 +315,10 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 所有引用 ID 必须真实存在。尽量忠于原文，新增内容必须通过 inventedContent 和 adaptationNotes 标明。
 
                 改编质量规则：
-                1. 当前章节拆成 2 到 5 个场景；地点、时间、主要行动目标变化时必须拆场。
-                2. 每场生成 5 到 14 个 beats，必须同时包含可拍摄 action 和关键 dialogue。
+                1. 场景数量与 Beat 数量严格遵守用户消息中的媒介规格；
+                   地点、时间、主要行动目标变化时仍应合理拆场。
+                2. 每场必须同时包含可执行 action 和关键 dialogue；
+                   不得用统一模板抹平电影、电视剧、短剧和舞台剧的节奏差异。
                 3. 原文存在引号对白时，优先保留有剧情功能、人物关系或情绪转折的原话，
                    禁止把整段对话概括成“众人议论”“两人交谈”。
                 4. dialogue 必须填写 characterId 和 text；必要时用 parenthetical 表示语气或小动作。
@@ -364,7 +366,8 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                     }]
                   }]
                 }
-                每个输入章节都必须恰好对应一个 chapters 项；每章规划 2 到 5 场。
+                每个输入章节都必须恰好对应一个 chapters 项；
+                每章场景数量必须遵守用户消息中的媒介规格。
                 场景按原文事件顺序排列，明确前后状态，避免跨章重复和人物瞬移。
                 引用只能使用 Story Bible 中已有 ID。原文没有对白时不要虚构长对白。
                 """;
@@ -394,6 +397,9 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 当前章节 ID：%s
                 当前章节标题：%s
 
+                必须遵守的媒介规格：
+                %s
+
                 已确认 Story Bible：
                 %s
 
@@ -404,9 +410,10 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 %s
                 """.formatted(
                 title,
-                format,
+                ScreenplayFormatProfiles.normalize(format),
                 chapter.id(),
                 chapter.title(),
+                ScreenplayFormatProfiles.prompt(format),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(storyBible),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(adaptationPlan),
                 chapter.content());
@@ -422,6 +429,9 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 作品名称：%s
                 目标形式：%s
 
+                必须遵守的媒介规格：
+                %s
+
                 Story Bible：
                 %s
 
@@ -429,7 +439,8 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 %s
                 """.formatted(
                 title,
-                format,
+                ScreenplayFormatProfiles.normalize(format),
+                ScreenplayFormatProfiles.prompt(format),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(storyBible),
                 chapterSource(chapters));
     }
@@ -599,15 +610,12 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 ? project.path("title").asText("未命名作品")
                 : title);
         project.put("sourceLanguage", "zh-CN");
-        project.put("format", normalizeFormat(format));
+        String normalizedFormat = ScreenplayFormatProfiles.normalize(format);
+        project.put("format", normalizedFormat);
         project.put("sourceChapterCount", Math.max(chapterCount, 3));
-    }
-
-    private String normalizeFormat(String format) {
-        return switch (format == null ? "" : format) {
-            case "film", "tv_series", "web_series", "stage_play" -> format;
-            default -> "web_series";
-        };
+        project.set(
+                "formatProfile",
+                objectMapper.valueToTree(ScreenplayFormatProfiles.profile(normalizedFormat)));
     }
 
     private void normalizeHeading(ObjectNode scene, Map<String, String> locationNames) {

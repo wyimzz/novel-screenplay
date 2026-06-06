@@ -12,6 +12,7 @@ const elements = {
   validation: document.querySelector("#validation"),
   projectTitle: document.querySelector("#projectTitle"),
   metrics: document.querySelector("#metrics"),
+  formatProfile: document.querySelector("#formatProfile"),
   characters: document.querySelector("#characters"),
   locations: document.querySelector("#locations"),
   props: document.querySelector("#props"),
@@ -240,6 +241,7 @@ function renderResult(data) {
     renderMetric("道具", screenplay.props.length),
     renderMetric("场景", screenplay.scenes.length)
   ].join("");
+  renderFormatProfile(screenplay.project);
 
   elements.characterCount.textContent = screenplay.characters.length;
   elements.locationCount.textContent = screenplay.locations.length;
@@ -255,6 +257,38 @@ function renderResult(data) {
   elements.edit.disabled = false;
   setPipeline("yaml");
   switchTab("assets");
+}
+
+function renderFormatProfile(project) {
+  const profile = project.formatProfile;
+  if (!profile) {
+    elements.formatProfile.innerHTML = "";
+    elements.formatProfile.classList.add("hidden");
+    return;
+  }
+  const labels = {
+    film: "电影",
+    tv_series: "电视剧",
+    web_series: "短剧",
+    stage_play: "舞台剧"
+  };
+  elements.formatProfile.classList.remove("hidden");
+  elements.formatProfile.innerHTML = `
+    <div class="format-profile-heading">
+      <div>
+        <span>媒介策略</span>
+        <strong>${escapeHtml(labels[project.format] || project.format)}</strong>
+      </div>
+      <b>约 ${escapeHtml(profile.targetDurationMinutes)} 分钟</b>
+    </div>
+    <div class="format-profile-body">
+      <p><strong>结构</strong>${escapeHtml(profile.structure)}</p>
+      <p><strong>节奏</strong>${escapeHtml(profile.pacing)}</p>
+      <ul>${(profile.constraints || [])
+        .map((item) => `<li>${escapeHtml(item)}</li>`)
+        .join("")}</ul>
+    </div>
+  `;
 }
 
 function openStructuredEditor() {

@@ -11,7 +11,21 @@ public record Screenplay(
         List<Scene> scenes,
         List<AdaptationNote> adaptationNotes
 ) {
-    public record Project(String title, String sourceLanguage, String format, int sourceChapterCount) {
+    public record Project(
+            String title,
+            String sourceLanguage,
+            String format,
+            int sourceChapterCount,
+            FormatProfile formatProfile
+    ) {
+    }
+
+    public record FormatProfile(
+            int targetDurationMinutes,
+            String structure,
+            String pacing,
+            List<String> constraints
+    ) {
     }
 
     public record CharacterProfile(

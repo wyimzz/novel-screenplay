@@ -4,6 +4,15 @@ project:
   sourceLanguage: "zh-CN"
   format: "web_series"
   sourceChapterCount: 3
+  formatProfile:
+    targetDurationMinutes: 12
+    structure: "竖屏短剧单集：强钩子、快速升级、连续反转、卡点收尾"
+    pacing: "短场景、高信息密度，前置冲突并减少铺垫"
+    constraints:
+      - "每章规划 3-6 场，单场目标单一且快速完成"
+      - "每场建议 5-12 个 Beat，动作和对白简短有力"
+      - "开场前 10 秒必须出现异常、目标或直接冲突"
+      - "每 1-2 场设置一次信息反转，结尾使用强悬念卡点"
 characters:
   - id: "char_001"
     name: "林舟"

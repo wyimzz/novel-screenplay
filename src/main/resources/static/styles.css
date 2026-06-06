@@ -310,6 +310,65 @@ input:focus, select:focus, textarea:focus {
   background: var(--panel);
 }
 
+.format-profile {
+  margin: 16px 0 22px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  background: #fff;
+}
+
+.format-profile-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.format-profile-heading span,
+.format-profile-heading strong {
+  display: inline;
+  font-size: 12px;
+}
+
+.format-profile-heading span {
+  margin-right: 8px;
+  color: var(--muted);
+}
+
+.format-profile-heading b {
+  color: var(--green);
+  font-size: 12px;
+}
+
+.format-profile-body {
+  padding: 13px 15px 15px;
+}
+
+.format-profile-body p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.format-profile-body p strong {
+  margin-right: 10px;
+  color: var(--ink);
+}
+
+.format-profile-body ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 20px;
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
 .metric {
   min-width: 0;
   padding: 14px;
@@ -720,6 +779,7 @@ pre {
   .asset-grid { grid-template-columns: 1fr; }
   .studio-heading { align-items: flex-start; }
   .settings-fields, .mode-control { grid-template-columns: 1fr; }
+  .format-profile-body ul { grid-template-columns: 1fr; }
   .settings-fields label { grid-column: 1 !important; }
   .block-editor { display: flex; flex-direction: column; overflow: auto; }
   .editor-scenes { max-height: 190px; border-right: 0; border-bottom: 1px solid var(--line); }

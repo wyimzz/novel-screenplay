@@ -25,6 +25,22 @@ public class ScreenplayValidator {
             messages.add("缺少 project 对象");
         } else if (screenplay.project().sourceChapterCount() < 3) {
             messages.add("源小说必须至少包含 3 个章节");
+        } else if (screenplay.project().formatProfile() == null) {
+            messages.add("project 缺少 formatProfile 媒介规格");
+        } else {
+            Screenplay.FormatProfile profile = screenplay.project().formatProfile();
+            if (profile.targetDurationMinutes() < 1) {
+                messages.add("formatProfile.targetDurationMinutes 必须大于 0");
+            }
+            if (profile.structure() == null || profile.structure().isBlank()) {
+                messages.add("formatProfile.structure 不能为空");
+            }
+            if (profile.pacing() == null || profile.pacing().isBlank()) {
+                messages.add("formatProfile.pacing 不能为空");
+            }
+            if (safeList(profile.constraints()).isEmpty()) {
+                messages.add("formatProfile.constraints 至少需要一条媒介约束");
+            }
         }
 
         Set<String> characterIds = new HashSet<>();
