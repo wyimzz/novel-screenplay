@@ -11,11 +11,12 @@ LumenX Studio 使用 MIT License，完整流程覆盖小说到动态视频。当
 | 剧本分析 | `ChapterParser` 与 `AiScreenplayGenerator` |
 | 角色、场景、道具提取 | 第一阶段独立生成 Story Bible |
 | 资产稳定引用 | `char_*`、`loc_*`、`prop_*` ID |
-| Storyboard 结构 | 按章节并行生成 `scenes` 与详细 `beats` |
+| Storyboard 结构 | 先生成全书改编蓝图，再按章节并行生成 `scenes` 与详细 `beats` |
 | 可视化编辑 | 场景导航与动作/对白块编辑器 |
 | AI 模型抽象 | `ScreenplayGenerator` 接口和页面 AI 设置 |
-| 生成过程反馈 | Story Bible、场景规划、剧本生成阶段状态 |
+| 生成过程反馈 | 后台任务返回 Story Bible、改编蓝图、动作对白和 YAML 校验的真实进度 |
 | 失败可见性 | API、解析和语义错误直接反馈，不静默降级 |
+| Preview / Apply 思路 | AI 产物先进入可编辑草稿，作者确认修改后再重导出 YAML |
 
 ## 暂不采用的设计
 
@@ -29,6 +30,6 @@ LumenX Studio 使用 MIT License，完整流程覆盖小说到动态视频。当
 
 ## 当前实现与后续边界
 
-当前版本已经完成 Story Bible 提取、分章详细剧本生成、块编辑和 YAML 重导出。和 LumenX 的 `frames` 思路一致，Beat 显式保存动作、对白、说话人和语气；Java 层逐字段归一化模型输出，而不是直接信任一次反序列化。
+当前版本已经完成 Story Bible 提取、全书改编蓝图、分章详细剧本生成、块编辑和 YAML 重导出。和 LumenX 的 `frames` 思路一致，Beat 显式保存动作、对白、说话人和语气；Java 层逐字段归一化模型输出，而不是直接信任一次反序列化。蓝图只作为生成约束，不强行写入最终 YAML，避免把模型内部规划污染作者需要编辑和交付的剧本格式。
 
 分镜图片与视频生成仍不进入题目三首个验收版本。后续可增加实体提取确认弹窗与拖拽调整场景顺序，但不需要引入 LumenX 的媒体渲染链路。
