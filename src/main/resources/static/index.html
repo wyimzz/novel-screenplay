@@ -167,11 +167,11 @@
         <input id="aiBaseUrl" value="https://api.deepseek.com">
       </label>
       <label>
-        <span>模型 ID</span>
-        <input id="aiModel" list="aiModelOptions" value="deepseek-v4-flash"
-               placeholder="选择建议模型或输入厂商模型 ID">
-        <datalist id="aiModelOptions"></datalist>
-        <small id="modelHint">可直接输入服务商支持的其他模型 ID</small>
+        <span>模型</span>
+        <select id="aiModelPreset" aria-label="预设模型"></select>
+        <input id="aiModel" class="hidden" value="deepseek-v4-flash"
+               placeholder="输入自定义模型 ID">
+        <small id="modelHint">选择服务商提供的模型，或使用自定义模型 ID</small>
       </label>
       <label>
         <span>API Key</span>
@@ -205,7 +205,30 @@
       </div>
       <button id="closeEditorBtn" class="close-button" type="button" title="关闭">×</button>
     </div>
-    <p class="editor-help">逐场修改场景信息、动作与对白。保存时会重新编号、校验引用并生成 YAML。</p>
+    <p class="editor-help">可修改故事资产、场景信息、动作与对白。保存时会重新编号、校验引用并生成 YAML。</p>
+    <section class="editor-assets">
+      <article class="editor-asset-panel">
+        <div class="editor-asset-heading">
+          <strong>人物</strong>
+          <button class="icon-button" type="button" title="新增人物" data-add-asset="characters">＋</button>
+        </div>
+        <div id="editorCharacters" class="editor-asset-list"></div>
+      </article>
+      <article class="editor-asset-panel">
+        <div class="editor-asset-heading">
+          <strong>地点</strong>
+          <button class="icon-button" type="button" title="新增地点" data-add-asset="locations">＋</button>
+        </div>
+        <div id="editorLocations" class="editor-asset-list"></div>
+      </article>
+      <article class="editor-asset-panel">
+        <div class="editor-asset-heading">
+          <strong>道具</strong>
+          <button class="icon-button" type="button" title="新增道具" data-add-asset="props">＋</button>
+        </div>
+        <div id="editorProps" class="editor-asset-list"></div>
+      </article>
+    </section>
     <div class="block-editor">
       <aside class="editor-scenes">
         <div class="editor-section-heading">
@@ -235,6 +258,14 @@
           <label>
             <span>地点</span>
             <input id="editSceneLocation" placeholder="场景地点">
+          </label>
+          <label>
+            <span>场景人物 ID</span>
+            <input id="editSceneCharacters" placeholder="char_001, char_002">
+          </label>
+          <label>
+            <span>场景道具 ID</span>
+            <input id="editSceneProps" placeholder="prop_001">
           </label>
           <label>
             <span>时间</span>

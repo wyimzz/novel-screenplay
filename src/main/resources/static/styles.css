@@ -559,6 +559,59 @@ pre {
 }
 .editor-help { margin: 14px 0 10px; color: var(--muted); font-size: 12px; }
 
+.editor-assets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 8px;
+  min-height: 0;
+  max-height: 230px;
+  margin-bottom: 10px;
+}
+
+.editor-asset-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #f7f8f6;
+}
+
+.editor-asset-heading {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.editor-asset-list {
+  max-height: 184px;
+  overflow: auto;
+  padding: 7px;
+}
+
+.editor-asset-row {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 7px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.editor-asset-row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.editor-asset-row code { color: var(--green); font-size: 10px; }
+.editor-asset-row input { height: 32px; }
+.editor-asset-row textarea { min-height: 48px; padding: 8px; resize: vertical; }
+.editor-asset-row label span { font-size: 9px; }
+.editor-asset-row .asset-delete { color: var(--accent); }
+.editor-asset-empty { padding: 14px 7px; color: var(--muted); font-size: 10px; }
+
 .block-editor {
   min-height: 0;
   flex: 1;
@@ -818,6 +871,12 @@ pre {
   .settings-fields, .mode-control { grid-template-columns: 1fr; }
   .format-profile-body ul { grid-template-columns: 1fr; }
   .settings-fields label { grid-column: 1 !important; }
+  .editor-assets {
+    display: flex;
+    max-height: 210px;
+    overflow-x: auto;
+  }
+  .editor-asset-panel { min-width: 250px; }
   .block-editor { display: flex; flex-direction: column; overflow: auto; }
   .editor-scenes { max-height: 190px; border-right: 0; border-bottom: 1px solid var(--line); }
   .editor-detail { overflow: visible; }
