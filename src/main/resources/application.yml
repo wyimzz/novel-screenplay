@@ -1,6 +1,6 @@
 spring:
   application:
-    name: novel-screenplay
+    name: zhangmu-screenplay
   jackson:
     default-property-inclusion: non_null
 

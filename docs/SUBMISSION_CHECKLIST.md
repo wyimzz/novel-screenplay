@@ -4,7 +4,7 @@
 
 - [x] GitHub 仓库可访问：<https://github.com/wyimzz/novel-screenplay>
 - [x] README 说明作品目标、运行方式、核心流程和原创改进
-- [x] README 列明第三方依赖与 LumenX 参考来源
+- [x] README 列明第三方依赖与相关开源参考项目
 - [x] API Key、构建目录和本地数据已加入 `.gitignore`
 - [ ] 截止后按赛事要求确认仓库公开可访问
 

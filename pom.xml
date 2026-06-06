@@ -14,7 +14,7 @@
     <groupId>com.example</groupId>
     <artifactId>novel-screenplay</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>novel-screenplay</name>
+    <name>zhangmu-screenplay</name>
     <description>AI-assisted novel to screenplay converter</description>
 
     <properties>

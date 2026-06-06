@@ -25,6 +25,6 @@ if (-not (Test-Path -LiteralPath $jarFile)) {
     throw "Application JAR is missing. Run .\mvnw.cmd package first."
 }
 
-Write-Host "Starting MirrorPage with DeepSeek on http://localhost:$Port"
+Write-Host "Starting ZhangMu with DeepSeek on http://localhost:$Port"
 Write-Host "AI model: $env:SCREENPLAY_AI_MODEL"
 & java -jar $jarFile "--server.port=$Port"
