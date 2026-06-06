@@ -206,89 +206,111 @@
       <button id="closeEditorBtn" class="close-button" type="button" title="关闭">×</button>
     </div>
     <p class="editor-help">可修改故事资产、场景信息、动作与对白。保存时会重新编号、校验引用并生成 YAML。</p>
-    <section class="editor-assets">
-      <article class="editor-asset-panel">
-        <div class="editor-asset-heading">
-          <strong>人物</strong>
-          <button class="icon-button" type="button" title="新增人物" data-add-asset="characters">＋</button>
-        </div>
-        <div id="editorCharacters" class="editor-asset-list"></div>
-      </article>
-      <article class="editor-asset-panel">
-        <div class="editor-asset-heading">
-          <strong>地点</strong>
-          <button class="icon-button" type="button" title="新增地点" data-add-asset="locations">＋</button>
-        </div>
-        <div id="editorLocations" class="editor-asset-list"></div>
-      </article>
-      <article class="editor-asset-panel">
-        <div class="editor-asset-heading">
-          <strong>道具</strong>
-          <button class="icon-button" type="button" title="新增道具" data-add-asset="props">＋</button>
-        </div>
-        <div id="editorProps" class="editor-asset-list"></div>
-      </article>
-    </section>
-    <div class="block-editor">
-      <aside class="editor-scenes">
-        <div class="editor-section-heading">
-          <strong>场景</strong>
-          <button id="addSceneBtn" class="icon-button" type="button" title="新增场景">＋</button>
-        </div>
-        <div id="editorSceneList" class="editor-scene-list"></div>
-      </aside>
-      <section class="editor-detail">
-        <div class="editor-grid">
-          <label>
-            <span>场景目的</span>
-            <input id="editScenePurpose" placeholder="本场承担的冲突、揭示或人物变化">
-          </label>
-          <label>
-            <span>来源章节</span>
-            <input id="editSceneChapters" placeholder="chapter_01">
-          </label>
-          <label>
-            <span>内 / 外景</span>
-            <select id="editSceneSetting">
-              <option value="INT">INT 内景</option>
-              <option value="EXT">EXT 外景</option>
-              <option value="INT/EXT">INT/EXT 内外景</option>
-            </select>
-          </label>
-          <label>
-            <span>地点</span>
-            <input id="editSceneLocation" placeholder="场景地点">
-          </label>
-          <label>
-            <span>场景人物 ID</span>
-            <input id="editSceneCharacters" placeholder="char_001, char_002">
-          </label>
-          <label>
-            <span>场景道具 ID</span>
-            <input id="editSceneProps" placeholder="prop_001">
-          </label>
-          <label>
-            <span>时间</span>
-            <select id="editSceneTime">
-              <option value="DAWN">黎明</option>
-              <option value="DAY">日间</option>
-              <option value="DUSK">黄昏</option>
-              <option value="NIGHT">夜晚</option>
-              <option value="CONTINUOUS">连续</option>
-              <option value="UNKNOWN">未确定</option>
-            </select>
-          </label>
-        </div>
-        <div class="editor-beat-heading">
-          <div>
-            <strong>动作与对白</strong>
-            <span id="editorBeatCount">0 个叙事单元</span>
+    <div class="editor-workspace">
+      <nav class="editor-navigation" aria-label="编辑内容">
+        <button class="editor-nav-option active" type="button" data-editor-section="characters">
+          <span>人物</span><b id="editorCharacterNavCount">0</b>
+        </button>
+        <button class="editor-nav-option" type="button" data-editor-section="locations">
+          <span>地点</span><b id="editorLocationNavCount">0</b>
+        </button>
+        <button class="editor-nav-option" type="button" data-editor-section="props">
+          <span>道具</span><b id="editorPropNavCount">0</b>
+        </button>
+        <button class="editor-nav-option" type="button" data-editor-section="scenes">
+          <span>场景</span><b id="editorSceneNavCount">0</b>
+        </button>
+      </nav>
+
+      <div class="editor-section-container">
+        <section class="editor-section-view" data-editor-view="characters">
+          <div class="editor-workspace-heading">
+            <div><strong>人物设定</strong><span>编辑人物身份、外观和首次出场章节</span></div>
+            <button class="button button-muted" type="button" data-add-asset="characters">新增人物</button>
           </div>
-          <button id="addBeatBtn" class="button button-muted" type="button">新增 Beat</button>
-        </div>
-        <div id="editorBeats" class="editor-beats"></div>
-        <button id="deleteSceneBtn" class="danger-button" type="button">删除当前场景</button>
-      </section>
+          <div id="editorCharacters" class="editor-asset-list"></div>
+        </section>
+
+        <section class="editor-section-view hidden" data-editor-view="locations">
+          <div class="editor-workspace-heading">
+            <div><strong>地点设定</strong><span>维护地点描述、时间氛围和场景名称引用</span></div>
+            <button class="button button-muted" type="button" data-add-asset="locations">新增地点</button>
+          </div>
+          <div id="editorLocations" class="editor-asset-list"></div>
+        </section>
+
+        <section class="editor-section-view hidden" data-editor-view="props">
+          <div class="editor-workspace-heading">
+            <div><strong>关键道具</strong><span>维护道具描述、剧情功能和首次出现章节</span></div>
+            <button class="button button-muted" type="button" data-add-asset="props">新增道具</button>
+          </div>
+          <div id="editorProps" class="editor-asset-list"></div>
+        </section>
+
+        <section class="editor-section-view hidden scene-editor-view" data-editor-view="scenes">
+          <div class="block-editor">
+            <aside class="editor-scenes">
+              <div class="editor-section-heading">
+                <strong>场景</strong>
+                <button id="addSceneBtn" class="icon-button" type="button" title="新增场景">＋</button>
+              </div>
+              <div id="editorSceneList" class="editor-scene-list"></div>
+            </aside>
+            <section class="editor-detail">
+              <div class="editor-grid">
+                <label>
+                  <span>场景目的</span>
+                  <input id="editScenePurpose" placeholder="本场承担的冲突、揭示或人物变化">
+                </label>
+                <label>
+                  <span>来源章节</span>
+                  <input id="editSceneChapters" placeholder="chapter_01">
+                </label>
+                <label>
+                  <span>内 / 外景</span>
+                  <select id="editSceneSetting">
+                    <option value="INT">INT 内景</option>
+                    <option value="EXT">EXT 外景</option>
+                    <option value="INT/EXT">INT/EXT 内外景</option>
+                  </select>
+                </label>
+                <label>
+                  <span>地点</span>
+                  <input id="editSceneLocation" placeholder="场景地点">
+                </label>
+                <label>
+                  <span>场景人物 ID</span>
+                  <input id="editSceneCharacters" placeholder="char_001, char_002">
+                </label>
+                <label>
+                  <span>场景道具 ID</span>
+                  <input id="editSceneProps" placeholder="prop_001">
+                </label>
+                <label>
+                  <span>时间</span>
+                  <select id="editSceneTime">
+                    <option value="DAWN">黎明</option>
+                    <option value="DAY">日间</option>
+                    <option value="DUSK">黄昏</option>
+                    <option value="NIGHT">夜晚</option>
+                    <option value="CONTINUOUS">连续</option>
+                    <option value="UNKNOWN">未确定</option>
+                  </select>
+                </label>
+              </div>
+              <div class="editor-beat-heading">
+                <div>
+                  <strong>动作与对白</strong>
+                  <span id="editorBeatCount">0 个叙事单元</span>
+                </div>
+                <button id="addBeatBtn" class="button button-muted" type="button">新增 Beat</button>
+              </div>
+              <div id="editorBeats" class="editor-beats"></div>
+              <button id="deleteSceneBtn" class="danger-button" type="button">删除当前场景</button>
+            </section>
+          </div>
+        </section>
+      </div>
     </div>
     <div id="editorResult" class="connection-result hidden"></div>
     <div class="dialog-actions">

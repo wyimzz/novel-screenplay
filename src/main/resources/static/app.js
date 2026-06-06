@@ -39,6 +39,10 @@ const editorElements = {
   characters: document.querySelector("#editorCharacters"),
   locations: document.querySelector("#editorLocations"),
   props: document.querySelector("#editorProps"),
+  characterNavCount: document.querySelector("#editorCharacterNavCount"),
+  locationNavCount: document.querySelector("#editorLocationNavCount"),
+  propNavCount: document.querySelector("#editorPropNavCount"),
+  sceneNavCount: document.querySelector("#editorSceneNavCount"),
   addScene: document.querySelector("#addSceneBtn"),
   deleteScene: document.querySelector("#deleteSceneBtn"),
   addBeat: document.querySelector("#addBeatBtn"),
@@ -115,6 +119,7 @@ let latestScreenplay = null;
 let aiEnabled = true;
 let editorDraft = null;
 let selectedSceneIndex = 0;
+let activeEditorSection = "characters";
 let previewVisible = false;
 let previewSceneCount = 0;
 
@@ -417,9 +422,11 @@ function openStructuredEditor() {
   if (!latestScreenplay) return;
   editorDraft = JSON.parse(JSON.stringify(latestScreenplay));
   selectedSceneIndex = 0;
+  activeEditorSection = "characters";
   editorElements.result.classList.add("hidden");
   renderAssetEditor();
   renderBlockEditor();
+  switchEditorSection("characters");
   editorElements.dialog.classList.remove("hidden");
 }
 
@@ -455,6 +462,29 @@ function renderAssetEditor() {
   renderEditableAssetList("characters", editorElements.characters);
   renderEditableAssetList("locations", editorElements.locations);
   renderEditableAssetList("props", editorElements.props);
+  updateEditorNavigationCounts();
+}
+
+function updateEditorNavigationCounts() {
+  if (!editorDraft) return;
+  editorElements.characterNavCount.textContent = (editorDraft.characters || []).length;
+  editorElements.locationNavCount.textContent = (editorDraft.locations || []).length;
+  editorElements.propNavCount.textContent = (editorDraft.props || []).length;
+  editorElements.sceneNavCount.textContent = (editorDraft.scenes || []).length;
+}
+
+function switchEditorSection(section) {
+  if (activeEditorSection === "scenes" && section !== "scenes") {
+    syncCurrentSceneFields();
+  }
+  activeEditorSection = section;
+  document.querySelectorAll("[data-editor-section]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.editorSection === section);
+  });
+  document.querySelectorAll("[data-editor-view]").forEach((view) => {
+    view.classList.toggle("hidden", view.dataset.editorView !== section);
+  });
+  if (section === "scenes") renderBlockEditor();
 }
 
 function renderEditableAssetList(type, container) {
@@ -511,6 +541,7 @@ function addAsset(type) {
   editorDraft[type] ||= [];
   editorDraft[type].push(base);
   renderAssetEditor();
+  switchEditorSection(type);
   if (type === "characters") renderEditorBeats();
 }
 
@@ -567,6 +598,7 @@ function parseIdList(value) {
 }
 
 function renderBlockEditor() {
+  updateEditorNavigationCounts();
   if (!editorDraft?.scenes?.length) {
     editorElements.sceneList.innerHTML = '<div class="asset-empty">暂无场景，请新增场景</div>';
     editorElements.beats.innerHTML = "";
@@ -668,6 +700,7 @@ function addEditorScene() {
   });
   selectedSceneIndex = index;
   renderBlockEditor();
+  updateEditorNavigationCounts();
 }
 
 function deleteEditorScene() {
@@ -675,6 +708,7 @@ function deleteEditorScene() {
   editorDraft.scenes.splice(selectedSceneIndex, 1);
   selectedSceneIndex = Math.max(0, selectedSceneIndex - 1);
   renderBlockEditor();
+  updateEditorNavigationCounts();
 }
 
 function addEditorBeat() {
@@ -1011,6 +1045,9 @@ editorElements.deleteScene.addEventListener("click", deleteEditorScene);
 editorElements.addBeat.addEventListener("click", addEditorBeat);
 document.querySelectorAll("[data-add-asset]").forEach((button) => {
   button.addEventListener("click", () => addAsset(button.dataset.addAsset));
+});
+document.querySelectorAll("[data-editor-section]").forEach((button) => {
+  button.addEventListener("click", () => switchEditorSection(button.dataset.editorSection));
 });
 editorElements.dialog.addEventListener("input", (event) => {
   const row = event.target.closest("[data-asset-type]");
