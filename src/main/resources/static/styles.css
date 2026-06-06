@@ -659,8 +659,8 @@ pre {
   margin-top: 20px;
 }
 
-.settings-fields label:nth-child(1),
-.settings-fields label:nth-child(3) { grid-column: 1 / -1; }
+.settings-fields label:nth-child(2),
+.settings-fields label:nth-child(4) { grid-column: 1 / -1; }
 .settings-fields small { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; }
 .disabled-fields { opacity: .45; pointer-events: none; }
 

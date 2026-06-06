@@ -245,21 +245,26 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
         request.put("model", settings.model());
         request.put("temperature", temperature);
         request.put("max_tokens", maxTokens);
-        request.put("thinking", Map.of("type", "disabled"));
-        request.put("response_format", Map.of("type", "json_object"));
+        if (settings.baseUrl().toLowerCase().contains("deepseek")) {
+            request.put("thinking", Map.of("type", "disabled"));
+            request.put("response_format", Map.of("type", "json_object"));
+        }
         request.put("messages", List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)
         ));
 
-        HttpRequest httpRequest = HttpRequest.newBuilder()
+        HttpRequest.Builder httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(normalizeBaseUrl(settings.baseUrl()) + "/chat/completions"))
                 .timeout(Duration.ofSeconds(Math.min(Math.max(settings.timeoutSeconds(), 30), 600)))
-                .header("Authorization", "Bearer " + settings.apiKey())
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(request)))
-                .build();
-        HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(request)));
+        if (settings.apiKey() != null && !settings.apiKey().isBlank()) {
+            httpRequest.header("Authorization", "Bearer " + settings.apiKey());
+        }
+        HttpResponse<String> response = httpClient.send(
+                httpRequest.build(),
+                HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             String message = objectMapper.readTree(response.body()).path("error").path("message").asText();
             throw new IllegalStateException(

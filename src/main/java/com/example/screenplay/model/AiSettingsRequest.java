@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public record AiSettingsRequest(
         boolean enabled,
+        String provider,
         @NotBlank(message = "API 地址不能为空")
         String baseUrl,
         String apiKey,
