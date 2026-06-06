@@ -31,9 +31,14 @@ const editorElements = {
   chapters: document.querySelector("#editSceneChapters"),
   setting: document.querySelector("#editSceneSetting"),
   location: document.querySelector("#editSceneLocation"),
+  sceneCharacters: document.querySelector("#editSceneCharacters"),
+  sceneProps: document.querySelector("#editSceneProps"),
   time: document.querySelector("#editSceneTime"),
   beats: document.querySelector("#editorBeats"),
   beatCount: document.querySelector("#editorBeatCount"),
+  characters: document.querySelector("#editorCharacters"),
+  locations: document.querySelector("#editorLocations"),
+  props: document.querySelector("#editorProps"),
   addScene: document.querySelector("#addSceneBtn"),
   deleteScene: document.querySelector("#deleteSceneBtn"),
   addBeat: document.querySelector("#addBeatBtn"),
@@ -48,8 +53,8 @@ const settingsElements = {
   fields: document.querySelector("#aiFields"),
   provider: document.querySelector("#aiProvider"),
   baseUrl: document.querySelector("#aiBaseUrl"),
+  modelPreset: document.querySelector("#aiModelPreset"),
   model: document.querySelector("#aiModel"),
-  modelOptions: document.querySelector("#aiModelOptions"),
   modelHint: document.querySelector("#modelHint"),
   apiKey: document.querySelector("#aiApiKey"),
   apiKeyHint: document.querySelector("#apiKeyHint"),
@@ -413,8 +418,124 @@ function openStructuredEditor() {
   editorDraft = JSON.parse(JSON.stringify(latestScreenplay));
   selectedSceneIndex = 0;
   editorElements.result.classList.add("hidden");
+  renderAssetEditor();
   renderBlockEditor();
   editorElements.dialog.classList.remove("hidden");
+}
+
+const assetDefinitions = {
+  characters: {
+    prefix: "char",
+    empty: "暂无人物",
+    defaultName: "新人物",
+    extraLabel: "首次出现",
+    extraField: "firstAppearance",
+    extraDefault: "chapter_01"
+  },
+  locations: {
+    prefix: "loc",
+    empty: "暂无地点",
+    defaultName: "新地点",
+    extraLabel: "时间氛围",
+    extraField: "timeOfDay",
+    extraDefault: "UNKNOWN"
+  },
+  props: {
+    prefix: "prop",
+    empty: "暂无道具",
+    defaultName: "新道具",
+    extraLabel: "剧情功能",
+    extraField: "storyFunction",
+    extraDefault: "推动情节或承载线索"
+  }
+};
+
+function renderAssetEditor() {
+  if (!editorDraft) return;
+  renderEditableAssetList("characters", editorElements.characters);
+  renderEditableAssetList("locations", editorElements.locations);
+  renderEditableAssetList("props", editorElements.props);
+}
+
+function renderEditableAssetList(type, container) {
+  const definition = assetDefinitions[type];
+  const items = editorDraft[type] || [];
+  if (!items.length) {
+    container.innerHTML = `<div class="editor-asset-empty">${definition.empty}</div>`;
+    return;
+  }
+  container.innerHTML = items.map((item, index) => `
+    <div class="editor-asset-row" data-asset-type="${type}" data-asset-index="${index}">
+      <div class="editor-asset-row-heading">
+        <code>${escapeHtml(item.id)}</code>
+        <button class="icon-button asset-delete" type="button"
+                title="删除${type === "characters" ? "人物" : type === "locations" ? "地点" : "道具"}"
+                data-delete-asset="${type}" data-asset-index="${index}">×</button>
+      </div>
+      <input data-asset-field="name" value="${escapeHtml(item.name || "")}" placeholder="名称">
+      <textarea data-asset-field="description" placeholder="描述">${escapeHtml(item.description || "")}</textarea>
+      <label>
+        <span>${definition.extraLabel}</span>
+        <input data-asset-field="${definition.extraField}"
+               value="${escapeHtml(item[definition.extraField] || definition.extraDefault)}">
+      </label>
+    </div>
+  `).join("");
+}
+
+function nextAssetId(type) {
+  const prefix = assetDefinitions[type].prefix;
+  const maximum = (editorDraft[type] || []).reduce((value, item) => {
+    const match = String(item.id || "").match(new RegExp(`^${prefix}_(\\d+)$`));
+    return Math.max(value, match ? Number(match[1]) : 0);
+  }, 0);
+  return `${prefix}_${String(maximum + 1).padStart(3, "0")}`;
+}
+
+function addAsset(type) {
+  const definition = assetDefinitions[type];
+  const id = nextAssetId(type);
+  const base = {
+    id,
+    name: definition.defaultName,
+    description: "",
+    [definition.extraField]: definition.extraDefault
+  };
+  if (type === "characters") {
+    Object.assign(base, {age: "未知", gender: "未知", clothing: "未说明", visualWeight: 3});
+  } else if (type === "locations") {
+    Object.assign(base, {lightingMood: "未说明", visualWeight: 3});
+  } else {
+    Object.assign(base, {firstAppearance: "chapter_01"});
+  }
+  editorDraft[type] ||= [];
+  editorDraft[type].push(base);
+  renderAssetEditor();
+  if (type === "characters") renderEditorBeats();
+}
+
+function deleteAsset(type, index) {
+  const item = editorDraft[type]?.[index];
+  if (!item) return;
+  editorDraft[type].splice(index, 1);
+  if (type === "characters") {
+    (editorDraft.scenes || []).forEach((scene) => {
+      scene.characters = (scene.characters || []).filter((id) => id !== item.id);
+      (scene.beats || []).forEach((beat) => {
+        if (beat.characterId === item.id) beat.characterId = null;
+      });
+    });
+    renderEditorBeats();
+  }
+  if (type === "props") {
+    (editorDraft.scenes || []).forEach((scene) => {
+      scene.props = (scene.props || []).filter((id) => id !== item.id);
+    });
+  }
+  renderAssetEditor();
+  if (type === "characters" || type === "props") {
+    renderBlockEditor();
+  }
 }
 
 function currentEditorScene() {
@@ -434,6 +555,15 @@ function syncCurrentSceneFields() {
     location: editorElements.location.value.trim(),
     time: editorElements.time.value
   };
+  scene.characters = parseIdList(editorElements.sceneCharacters.value);
+  scene.props = parseIdList(editorElements.sceneProps.value);
+}
+
+function parseIdList(value) {
+  return value
+    .split(/[,，\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function renderBlockEditor() {
@@ -464,6 +594,8 @@ function renderBlockEditor() {
   editorElements.chapters.value = scene.sourceChapterIds.join(", ");
   editorElements.setting.value = scene.heading.setting || "INT";
   editorElements.location.value = scene.heading.location || "";
+  editorElements.sceneCharacters.value = (scene.characters || []).join(", ");
+  editorElements.sceneProps.value = (scene.props || []).join(", ");
   editorElements.time.value = scene.heading.time || "UNKNOWN";
   editorElements.deleteScene.disabled = false;
   renderEditorBeats();
@@ -605,30 +737,48 @@ function aiSettingsPayload() {
     provider: settingsElements.provider.value,
     baseUrl: settingsElements.baseUrl.value.trim(),
     apiKey: settingsElements.apiKey.value.trim(),
-    model: settingsElements.model.value,
+    model: settingsElements.modelPreset.value === "__custom__"
+      ? settingsElements.model.value.trim()
+      : settingsElements.modelPreset.value,
     timeoutSeconds: Number(settingsElements.timeout.value)
   };
 }
 
 function renderModelOptions(providerId, selectedModel, updateEndpoint = true) {
   const provider = aiProviders[providerId] || aiProviders.custom;
-  settingsElements.modelOptions.innerHTML = provider.models
-    .map((model) => `<option value="${escapeHtml(model)}"></option>`)
-    .join("");
+  const knownModel = provider.models.includes(selectedModel);
+  settingsElements.modelPreset.innerHTML = [
+    ...provider.models.map((model) =>
+      `<option value="${escapeHtml(model)}">${escapeHtml(model)}</option>`),
+    '<option value="__custom__">自定义模型 ID…</option>'
+  ].join("");
   settingsElements.modelHint.textContent = provider.hint;
   if (updateEndpoint) {
     settingsElements.baseUrl.value = provider.baseUrl;
   }
-  if (selectedModel) {
+  if (selectedModel && knownModel) {
+    settingsElements.modelPreset.value = selectedModel;
+    settingsElements.model.value = selectedModel;
+  } else if (selectedModel) {
+    settingsElements.modelPreset.value = "__custom__";
     settingsElements.model.value = selectedModel;
   } else if (provider.models.length) {
+    settingsElements.modelPreset.value = provider.models[0];
     settingsElements.model.value = provider.models[0];
   } else {
+    settingsElements.modelPreset.value = "__custom__";
     settingsElements.model.value = "";
   }
+  updateCustomModelVisibility();
   settingsElements.apiKey.placeholder = providerId === "ollama"
     ? "本地 Ollama 无需填写"
     : `输入 ${provider.label} API Key`;
+}
+
+function updateCustomModelVisibility() {
+  const custom = settingsElements.modelPreset.value === "__custom__";
+  settingsElements.model.classList.toggle("hidden", !custom);
+  if (!custom) settingsElements.model.value = settingsElements.modelPreset.value;
 }
 
 function setAiMode(enabled) {
@@ -840,6 +990,7 @@ settingsElements.provider.addEventListener("change", () => {
     ? "本地接口无需 Key"
     : "切换服务商后请输入对应 API Key";
 });
+settingsElements.modelPreset.addEventListener("change", updateCustomModelVisibility);
 settingsElements.open.addEventListener("click", () => {
   settingsElements.dialog.classList.remove("hidden");
   settingsElements.result.classList.add("hidden");
@@ -858,6 +1009,35 @@ editorElements.apply.addEventListener("click", applyStructuredEdit);
 editorElements.addScene.addEventListener("click", addEditorScene);
 editorElements.deleteScene.addEventListener("click", deleteEditorScene);
 editorElements.addBeat.addEventListener("click", addEditorBeat);
+document.querySelectorAll("[data-add-asset]").forEach((button) => {
+  button.addEventListener("click", () => addAsset(button.dataset.addAsset));
+});
+editorElements.dialog.addEventListener("input", (event) => {
+  const row = event.target.closest("[data-asset-type]");
+  const field = event.target.dataset.assetField;
+  if (!row || !field) return;
+  const type = row.dataset.assetType;
+  const item = editorDraft[type]?.[Number(row.dataset.assetIndex)];
+  if (!item) return;
+  const previousValue = item[field];
+  item[field] = event.target.value;
+  if (type === "locations" && field === "name") {
+    (editorDraft.scenes || []).forEach((scene) => {
+      if (scene.heading?.location === previousValue) {
+        scene.heading.location = item.name;
+      }
+    });
+    if (editorElements.location.value === previousValue) {
+      editorElements.location.value = item.name;
+    }
+  }
+  if (type === "characters" && field === "name") renderEditorBeats();
+});
+editorElements.dialog.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-delete-asset]");
+  if (!button) return;
+  deleteAsset(button.dataset.deleteAsset, Number(button.dataset.assetIndex));
+});
 editorElements.sceneList.addEventListener("click", (event) => {
   const option = event.target.closest("[data-scene-index]");
   if (!option) return;
