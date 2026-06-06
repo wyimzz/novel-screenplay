@@ -26,4 +26,30 @@ class ScreenplayFormatProfilesTest {
         assertThat(television).isNotEqualTo(webSeries);
         assertThat(webSeries).isNotEqualTo(stagePlay);
     }
+
+    @Test
+    void createsFormatSpecificSceneStructures() {
+        var filmOpening = ScreenplayFormatProfiles.sceneDesign("film", 0, 6);
+        var televisionSecondScene = ScreenplayFormatProfiles.sceneDesign("tv_series", 1, 6);
+        var webOpening = ScreenplayFormatProfiles.sceneDesign("web_series", 0, 6);
+        var webEnding = ScreenplayFormatProfiles.sceneDesign("web_series", 5, 6);
+        var stageScene = ScreenplayFormatProfiles.sceneDesign("stage_play", 2, 6);
+
+        assertThat(filmOpening.sectionLabel()).contains("第一幕");
+        assertThat(filmOpening.productionNotes()).anyMatch(note -> note.contains("镜头"));
+
+        assertThat(televisionSecondScene.storyLine()).isEqualTo("B_STORY");
+        assertThat(televisionSecondScene.dramaticFunction()).isEqualTo("act_turn");
+
+        assertThat(webOpening.sectionLabel()).contains("HOOK");
+        assertThat(webEnding.sectionLabel()).contains("CLIFFHANGER");
+        assertThat(webOpening.estimatedDurationSeconds()).isLessThanOrEqualTo(120);
+
+        assertThat(stageScene.sectionLabel()).contains("幕").contains("场");
+        assertThat(stageScene.productionNotes()).anyMatch(note -> note.contains("出入场"));
+
+        assertThat(filmOpening).isNotEqualTo(televisionSecondScene);
+        assertThat(televisionSecondScene).isNotEqualTo(webOpening);
+        assertThat(webOpening).isNotEqualTo(stageScene);
+    }
 }

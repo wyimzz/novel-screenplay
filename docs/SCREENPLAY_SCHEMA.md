@@ -88,6 +88,13 @@ scenes:
     purpose: "林舟取得神秘来信并见到苏禾"
     characters: ["char_001", "char_002"]
     props: ["prop_001"]
+    formatDesign:
+      sectionLabel: "HOOK · 前10秒"
+      storyLine: "MAIN"
+      dramaticFunction: "hook"
+      estimatedDurationSeconds: 45
+      productionNotes:
+        - "首屏直接出现神秘来信与取信目标"
     beats: []
     continuity:
       previousSceneId: null
@@ -100,6 +107,13 @@ scenes:
 
 - `sourceChapterIds` 支持一章拆成多场，也支持多章合并为一场。
 - `heading` 使用影视剧本常见的内外景、地点、时间结构。
+- `formatDesign` 把媒介差异落实到每个场景，而不是只在项目级保存一个形式标签。
+  - 电影使用三幕或序列标记，强调视觉动作、空间、镜头与声音。
+  - 电视剧使用 `TEASER/ACT/TAG`、A/B/C 故事线和幕尾转折。
+  - 竖屏短剧使用 `HOOK/ESCALATION/REVERSAL/CLIFFHANGER`，并约束秒级时长。
+  - 舞台剧使用幕/场标记，制作提示必须关注出入场、站位、灯光、音效与换景。
+- `estimatedDurationSeconds` 让作者能量化检查不同媒介的节奏密度。
+- `productionNotes` 保存该场景在拍摄或舞台执行上的重点，避免动作只停留在小说叙述层。
 - `purpose` 明确场景承担的信息、冲突或人物变化，防止生成无效场景。
 - `characters` 和 `props` 只引用全局稳定 ID。
 - `continuity` 必须是结构化对象，不能使用“开篇场景”等自然语言字符串。

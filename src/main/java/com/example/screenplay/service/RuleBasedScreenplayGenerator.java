@@ -86,6 +86,7 @@ public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
                     summarize(chapter.content()),
                     sceneCharacters,
                     sceneProps,
+                    ScreenplayFormatProfiles.sceneDesign(format, i, chapters.size()),
                     buildBeats(chapter, characterIds),
                     new Screenplay.Continuity(previous, next),
                     new Screenplay.SourceFidelity(
