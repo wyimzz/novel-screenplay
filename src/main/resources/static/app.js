@@ -16,6 +16,7 @@ const elements = {
   characters: document.querySelector("#characters"),
   locations: document.querySelector("#locations"),
   props: document.querySelector("#props"),
+  sceneOutline: document.querySelector("#sceneOutline"),
   scenes: document.querySelector("#scenes"),
   output: document.querySelector("#output"),
   characterCount: document.querySelector("#characterCount"),
@@ -66,7 +67,8 @@ const settingsElements = {
   test: document.querySelector("#testAiBtn"),
   save: document.querySelector("#saveAiBtn"),
   result: document.querySelector("#connectionResult"),
-  runtimeStatus: document.querySelector("#runtimeStatus")
+  runtimeStatus: document.querySelector("#runtimeStatus"),
+  latency: document.querySelector("#aiLatencyBtn")
 };
 
 const aiProviders = {
@@ -248,13 +250,43 @@ function renderScenes(screenplay) {
   const format = screenplay.project?.format || "web_series";
   const characterNames = Object.fromEntries(characters.map((item) => [item.id, item.name]));
   if (!scenes.length) {
+    elements.sceneOutline.innerHTML = "";
     elements.scenes.innerHTML = '<div class="asset-empty">章节剧本生成后，动作与对白会逐章出现在这里</div>';
     return;
   }
+  const chapterGroups = new Map();
+  scenes.forEach((scene, index) => {
+    const chapterId = scene.sourceChapterIds?.[0] || "未分章";
+    if (!chapterGroups.has(chapterId)) chapterGroups.set(chapterId, []);
+    chapterGroups.get(chapterId).push({scene, index});
+  });
+  elements.sceneOutline.innerHTML = `
+    <div class="scene-outline-heading">
+      <strong>场景大纲</strong>
+      <span>${scenes.length} 场</span>
+    </div>
+    ${Array.from(chapterGroups.entries()).map(([chapterId, entries]) => `
+      <section class="scene-outline-group">
+        <h4>${escapeHtml(chapterId)}</h4>
+        ${entries.map(({scene, index}) => {
+          const design = scene.formatDesign || formatDesignFallback(format, index, scenes.length);
+          return `
+            <button class="scene-outline-item" type="button" data-scene-target="scene-${index + 1}">
+              <b>${String(index + 1).padStart(2, "0")}</b>
+              <span>
+                <strong>${escapeHtml(design.sectionLabel)}</strong>
+                <small>${escapeHtml(scene.purpose)}</small>
+              </span>
+            </button>
+          `;
+        }).join("")}
+      </section>
+    `).join("")}
+  `;
   elements.scenes.innerHTML = scenes.map((scene, index) => {
     const design = scene.formatDesign || formatDesignFallback(format, index, scenes.length);
     return `
-    <article class="scene-item scene-format-${escapeHtml(format)}">
+    <article id="scene-${index + 1}" class="scene-item scene-format-${escapeHtml(format)}">
       <div class="scene-format-bar">
         <strong>${escapeHtml(design.sectionLabel)}</strong>
         <span>${escapeHtml(design.storyLine)} · ${escapeHtml(design.dramaticFunction)}</span>
@@ -301,6 +333,16 @@ function renderScenes(screenplay) {
     </article>
   `;
   }).join("");
+  elements.sceneOutline.querySelectorAll("[data-scene-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = document.querySelector(`#${button.dataset.sceneTarget}`);
+      if (!target) return;
+      elements.sceneOutline.querySelectorAll(".scene-outline-item").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+      target.scrollIntoView({behavior: "smooth", block: "start"});
+    });
+  });
 }
 
 function renderPreview(screenplay, stage, message) {
@@ -833,6 +875,52 @@ function updateRuntimeStatus(settings) {
   settingsElements.runtimeStatus.querySelector("b").textContent = active
     ? `${settings.provider} · ${settings.model}`
     : "离线规则模式";
+  settingsElements.latency.disabled = !active;
+  if (!active) updateLatencyStatus(null, "离线");
+}
+
+function latencyLevel(latencyMs) {
+  if (latencyMs < 800) return {className: "fast", label: "快"};
+  if (latencyMs < 2000) return {className: "medium", label: "一般"};
+  return {className: "slow", label: "慢"};
+}
+
+function updateLatencyStatus(result, fallback = "未检测") {
+  const button = settingsElements.latency;
+  button.classList.remove("idle", "testing", "fast", "medium", "slow", "failure");
+  if (!result) {
+    button.classList.add("idle");
+    button.querySelector("b").textContent = `延迟 ${fallback}`;
+    button.title = "测试当前 AI 连接速度";
+    return;
+  }
+  if (!result.success) {
+    button.classList.add("failure");
+    button.querySelector("b").textContent = "AI 不可达";
+    button.title = result.message || "当前 AI 连接失败";
+    return;
+  }
+  const level = latencyLevel(result.latencyMs);
+  button.classList.add(level.className);
+  button.querySelector("b").textContent = `${result.latencyMs} ms · ${level.label}`;
+  button.title = `当前 AI 响应延迟 ${result.latencyMs} ms，点击重新测试`;
+}
+
+async function testCurrentAiLatency() {
+  if (settingsElements.latency.disabled) return;
+  settingsElements.latency.disabled = true;
+  settingsElements.latency.classList.remove("idle", "fast", "medium", "slow", "failure");
+  settingsElements.latency.classList.add("testing");
+  settingsElements.latency.querySelector("b").textContent = "测速中…";
+  try {
+    const response = await fetch("/api/settings/ai/test-current", {method: "POST"});
+    const result = await response.json();
+    updateLatencyStatus(result);
+  } catch (error) {
+    updateLatencyStatus({success: false, message: error.message, latencyMs: 0});
+  } finally {
+    settingsElements.latency.disabled = false;
+  }
 }
 
 async function loadAiSettings() {
@@ -850,6 +938,7 @@ async function loadAiSettings() {
       ? "已配置 Key，留空保存将继续使用原 Key"
       : "尚未配置 Key";
     updateRuntimeStatus(settings);
+    if (settings.activeMode === "AI") testCurrentAiLatency();
   } catch (error) {
     settingsElements.runtimeStatus.querySelector("b").textContent = "AI 设置读取失败";
   }
@@ -876,6 +965,7 @@ async function testAiConnection() {
       result.success,
       result.success ? `${result.message}，延迟 ${result.latencyMs} ms` : result.message
     );
+    updateLatencyStatus(result);
   } catch (error) {
     showConnectionResult(false, error.message);
   } finally {
@@ -901,6 +991,7 @@ async function saveAiSettings() {
       ? "已配置 Key，留空保存将继续使用原 Key"
       : "尚未配置 Key";
     showConnectionResult(true, result.activeMode === "AI" ? "已启用 AI 模式" : "已切换到离线规则模式");
+    if (result.activeMode === "AI") testCurrentAiLatency();
   } catch (error) {
     showConnectionResult(false, error.message);
   } finally {
@@ -1035,6 +1126,7 @@ settingsElements.dialog.addEventListener("click", (event) => {
 });
 settingsElements.test.addEventListener("click", testAiConnection);
 settingsElements.save.addEventListener("click", saveAiSettings);
+settingsElements.latency.addEventListener("click", testCurrentAiLatency);
 editorElements.close.addEventListener("click", () => editorElements.dialog.classList.add("hidden"));
 editorElements.dialog.addEventListener("click", (event) => {
   if (event.target === editorElements.dialog) editorElements.dialog.classList.add("hidden");

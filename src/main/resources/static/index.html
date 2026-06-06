@@ -17,6 +17,10 @@
   </div>
   <div class="header-actions">
     <div id="runtimeStatus" class="runtime-status"><span></span><b>正在读取 AI 设置</b></div>
+    <button id="aiLatencyBtn" class="latency-status idle" type="button" title="测试当前 AI 连接速度">
+      <span class="latency-dot"></span>
+      <b>延迟 --</b>
+    </button>
     <button id="aiSettingsBtn" class="settings-button" type="button" title="AI 设置">AI 设置</button>
   </div>
 </header>
@@ -118,7 +122,10 @@
       </div>
 
       <div id="scenesView" class="tab-view hidden">
-        <div id="scenes" class="scene-list"></div>
+        <div class="scene-browser">
+          <aside id="sceneOutline" class="scene-outline" aria-label="场景大纲"></aside>
+          <div id="scenes" class="scene-list"></div>
+        </div>
       </div>
 
       <div id="yamlView" class="tab-view hidden">

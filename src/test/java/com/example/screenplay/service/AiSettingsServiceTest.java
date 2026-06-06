@@ -51,4 +51,23 @@ class AiSettingsServiceTest {
         assertThat(service.view().activeMode()).isEqualTo("AI");
         assertThat(service.current().available()).isTrue();
     }
+
+    @Test
+    void reportsUnavailableWhenTestingCurrentOfflineSettings() {
+        AiSettingsService service = new AiSettingsService(
+                new AiModelProperties(
+                        false,
+                        "https://api.deepseek.com",
+                        "",
+                        "deepseek-chat",
+                        180),
+                new ObjectMapper(),
+                false);
+
+        var result = service.testCurrent();
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.latencyMs()).isZero();
+        assertThat(result.message()).contains("离线模式");
+    }
 }

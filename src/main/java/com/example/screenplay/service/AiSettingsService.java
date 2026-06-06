@@ -122,6 +122,20 @@ public class AiSettingsService {
         }
     }
 
+    public AiConnectionTestResult testCurrent() {
+        RuntimeAiSettings current = settings;
+        if (!current.available()) {
+            return new AiConnectionTestResult(false, "当前为离线模式或尚未配置 API Key", 0);
+        }
+        return test(new AiSettingsRequest(
+                true,
+                detectProviderId(current.baseUrl()),
+                current.baseUrl(),
+                "",
+                current.model(),
+                current.timeoutSeconds()));
+    }
+
     private String readError(String responseBody, int statusCode) {
         try {
             JsonNode root = objectMapper.readTree(responseBody);

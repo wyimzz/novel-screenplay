@@ -36,4 +36,9 @@ public class AiSettingsController {
     public AiConnectionTestResult testConnection(@Valid @RequestBody AiSettingsRequest request) {
         return settingsService.test(request);
     }
+
+    @PostMapping("/test-current")
+    public AiConnectionTestResult testCurrentConnection() {
+        return settingsService.testCurrent();
+    }
 }
