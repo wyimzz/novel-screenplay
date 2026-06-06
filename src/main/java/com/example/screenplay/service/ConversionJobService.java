@@ -56,6 +56,7 @@ public class ConversionJobService {
         private volatile String stage = "source";
         private volatile String message = "任务已创建";
         private volatile int percent;
+        private volatile com.example.screenplay.model.Screenplay preview;
         private volatile com.example.screenplay.model.ConversionResult result;
         private volatile String error;
 
@@ -67,10 +68,13 @@ public class ConversionJobService {
             stage = progress.stage();
             message = progress.message();
             percent = Math.max(percent, progress.percent());
+            if (progress.preview() != null) {
+                preview = progress.preview();
+            }
         }
 
         private ConversionJob snapshot() {
-            return new ConversionJob(id, status, stage, message, percent, result, error);
+            return new ConversionJob(id, status, stage, message, percent, preview, result, error);
         }
     }
 }

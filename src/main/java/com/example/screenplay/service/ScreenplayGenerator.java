@@ -18,7 +18,9 @@ public interface ScreenplayGenerator {
             Consumer<GenerationProgress> progress
     ) {
         progress.accept(new GenerationProgress("scenes", "正在生成结构化剧本", 55));
-        return generate(title, format, chapters);
+        Screenplay screenplay = generate(title, format, chapters);
+        progress.accept(new GenerationProgress("scenes", "结构化场景已生成", 90, screenplay));
+        return screenplay;
     }
 
     String mode();

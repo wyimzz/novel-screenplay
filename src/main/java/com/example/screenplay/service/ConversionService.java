@@ -56,14 +56,14 @@ public class ConversionService {
                 request.format(),
                 chapters,
                 progress);
-        progress.accept(new GenerationProgress("yaml", "正在校验结构并生成 YAML", 95));
+        progress.accept(new GenerationProgress("yaml", "正在校验结构并生成 YAML", 95, screenplay));
         List<String> messages = validator.validate(screenplay);
         ConversionResult result = new ConversionResult(
                 generator.mode(),
                 screenplay,
                 toYaml(screenplay),
                 messages);
-        progress.accept(new GenerationProgress("yaml", "剧本初稿生成完成", 100));
+        progress.accept(new GenerationProgress("yaml", "剧本初稿生成完成", 100, screenplay));
         return result;
     }
 
