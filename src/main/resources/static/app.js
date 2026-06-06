@@ -172,7 +172,9 @@ function renderAsset(container, items, type) {
   `).join("");
 }
 
-function beatLabel(type) {
+function beatLabel(type, format) {
+  if (type === "action" && format === "stage_play") return "舞台调度";
+  if (type === "shot" && format === "stage_play") return "灯光 / 音效";
   return {
     action: "动作",
     dialogue: "对白",
@@ -184,16 +186,70 @@ function beatLabel(type) {
   }[type] || type;
 }
 
+function formatDesignFallback(format, index, total) {
+  const last = index === Math.max(total - 1, 0);
+  if (format === "film") {
+    return {
+      sectionLabel: index === 0 ? "第一幕 · 建置" : last ? "第三幕 · 高潮与收束" : "第二幕 · 对抗",
+      storyLine: "MAIN",
+      dramaticFunction: index === 0 ? "setup" : last ? "resolution" : "escalation",
+      estimatedDurationSeconds: 180,
+      productionNotes: ["以可视化动作和空间关系推进"]
+    };
+  }
+  if (format === "tv_series") {
+    return {
+      sectionLabel: index === 0 ? "TEASER · 冷开场" : last ? "ACT FOUR · 集尾悬念" : "ACT TWO",
+      storyLine: index % 3 === 1 ? "B_STORY" : "A_STORY",
+      dramaticFunction: index === 0 ? "hook" : last ? "cliffhanger" : "act_turn",
+      estimatedDurationSeconds: 120,
+      productionNotes: ["推进故事线并形成幕转折"]
+    };
+  }
+  if (format === "stage_play") {
+    return {
+      sectionLabel: `第一幕 · 第${index + 1}场`,
+      storyLine: "ENSEMBLE",
+      dramaticFunction: index === 0 ? "setup" : last ? "resolution" : "confrontation",
+      estimatedDurationSeconds: 300,
+      productionNotes: ["标明出入场、站位、灯光、音效或换景需求"]
+    };
+  }
+  return {
+    sectionLabel: index === 0 ? "HOOK · 前10秒" : last ? "CLIFFHANGER · 卡点" : "REVERSAL · 反转",
+    storyLine: "MAIN",
+    dramaticFunction: index === 0 ? "hook" : last ? "cliffhanger" : "reversal",
+    estimatedDurationSeconds: 60,
+    productionNotes: ["首屏进入冲突，场尾保留反转或卡点"]
+  };
+}
+
+function durationLabel(seconds) {
+  const value = Number(seconds) || 0;
+  if (value < 60) return `${value} 秒`;
+  const minutes = Math.floor(value / 60);
+  const remainder = value % 60;
+  return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分钟`;
+}
+
 function renderScenes(screenplay) {
   const characters = screenplay.characters || [];
   const scenes = screenplay.scenes || [];
+  const format = screenplay.project?.format || "web_series";
   const characterNames = Object.fromEntries(characters.map((item) => [item.id, item.name]));
   if (!scenes.length) {
     elements.scenes.innerHTML = '<div class="asset-empty">章节剧本生成后，动作与对白会逐章出现在这里</div>';
     return;
   }
-  elements.scenes.innerHTML = scenes.map((scene, index) => `
-    <article class="scene-item">
+  elements.scenes.innerHTML = scenes.map((scene, index) => {
+    const design = scene.formatDesign || formatDesignFallback(format, index, scenes.length);
+    return `
+    <article class="scene-item scene-format-${escapeHtml(format)}">
+      <div class="scene-format-bar">
+        <strong>${escapeHtml(design.sectionLabel)}</strong>
+        <span>${escapeHtml(design.storyLine)} · ${escapeHtml(design.dramaticFunction)}</span>
+        <b>${escapeHtml(durationLabel(design.estimatedDurationSeconds))}</b>
+      </div>
       <div class="scene-header">
         <div class="scene-number">${String(index + 1).padStart(2, "0")}</div>
         <div>
@@ -213,7 +269,7 @@ function renderScenes(screenplay) {
       <div class="beats">
         ${scene.beats.map((beat) => `
           <div class="beat beat-${escapeHtml(beat.type)}">
-            <span>${escapeHtml(beatLabel(beat.type))}</span>
+            <span>${escapeHtml(beatLabel(beat.type, format))}</span>
             <div>
               ${beat.characterId
                 ? `<strong>${escapeHtml(characterNames[beat.characterId] || beat.characterId)}
@@ -225,11 +281,16 @@ function renderScenes(screenplay) {
           </div>
         `).join("")}
       </div>
+      <div class="production-notes">
+        <b>${format === "stage_play" ? "舞台执行" : "制作重点"}</b>
+        ${(design.productionNotes || []).map((note) => `<span>${escapeHtml(note)}</span>`).join("")}
+      </div>
       ${scene.sourceFidelity?.evidence
         ? `<div class="scene-evidence"><b>原文依据</b>${escapeHtml(scene.sourceFidelity.evidence)}</div>`
         : ""}
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function renderPreview(screenplay, stage, message) {
@@ -421,7 +482,7 @@ function renderEditorBeats() {
         <span>${String(index + 1).padStart(2, "0")}</span>
         <select data-beat-field="type" aria-label="Beat 类型">
           ${["action", "dialogue", "voice_over", "narration", "transition", "shot", "note"]
-            .map((type) => `<option value="${type}" ${beat.type === type ? "selected" : ""}>${escapeHtml(beatLabel(type))}</option>`)
+            .map((type) => `<option value="${type}" ${beat.type === type ? "selected" : ""}>${escapeHtml(beatLabel(type, editorDraft.project?.format))}</option>`)
             .join("")}
         </select>
         <button class="icon-button beat-delete" type="button" title="删除 Beat" data-delete-beat="${index}">×</button>
@@ -458,6 +519,11 @@ function addEditorScene() {
     purpose: "待补充场景目的",
     characters: [],
     props: [],
+    formatDesign: formatDesignFallback(
+      editorDraft.project?.format || "web_series",
+      index,
+      index + 1
+    ),
     beats: [{
       id: `beat_${String(index + 1).padStart(3, "0")}_01`,
       type: "action",

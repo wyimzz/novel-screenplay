@@ -77,6 +77,20 @@ public class ScreenplayValidator {
             if (scene.sourceFidelity() == null) {
                 messages.add("场景 " + scene.id() + " 缺少 sourceFidelity 对象");
             }
+            if (scene.formatDesign() == null) {
+                messages.add("场景 " + scene.id() + " 缺少 formatDesign 媒介结构");
+            } else {
+                if (scene.formatDesign().sectionLabel() == null
+                        || scene.formatDesign().sectionLabel().isBlank()) {
+                    messages.add("场景 " + scene.id() + " 的 formatDesign.sectionLabel 不能为空");
+                }
+                if (scene.formatDesign().estimatedDurationSeconds() < 10) {
+                    messages.add("场景 " + scene.id() + " 的预计时长不能小于 10 秒");
+                }
+                if (safeList(scene.formatDesign().productionNotes()).isEmpty()) {
+                    messages.add("场景 " + scene.id() + " 至少需要一条制作提示");
+                }
+            }
             if (safeList(scene.beats()).isEmpty()) {
                 messages.add("场景 " + scene.id() + " 至少需要一个 beat");
             }

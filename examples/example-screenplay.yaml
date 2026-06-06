@@ -53,6 +53,14 @@ scenes:
     purpose: "林舟取得神秘来信并见到苏禾"
     characters: ["char_001", "char_002"]
     props: ["prop_001"]
+    formatDesign:
+      sectionLabel: "HOOK · 前10秒"
+      storyLine: "MAIN"
+      dramaticFunction: "hook"
+      estimatedDurationSeconds: 45
+      productionNotes:
+        - "首屏用雨夜推门和神秘来信直接建立异常"
+        - "竖屏构图聚焦信封、手部动作和人物对视"
     beats:
       - id: "beat_001_01"
         type: "action"

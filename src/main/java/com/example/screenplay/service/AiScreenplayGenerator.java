@@ -335,7 +335,9 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 你是专业影视编剧。请把当前单章小说改编成可直接继续打磨的详细剧本场景。
                 输出严格 JSON，不要 Markdown，不要解释。顶层只能包含 scenes、adaptationNotes。
                 必须使用给定 Story Bible 中的角色、地点和道具 ID，不得擅自改 ID。
-                每个场景必须包含 sourceChapterIds、heading、purpose、characters、props、beats、continuity、sourceFidelity。
+                每个场景必须包含 sourceChapterIds、heading、purpose、characters、props、formatDesign、beats、continuity、sourceFidelity。
+                formatDesign 必须是对象，包含 sectionLabel、storyLine、dramaticFunction、
+                estimatedDurationSeconds、productionNotes。
                 continuity 必须是对象：{"previousSceneId": null或场景ID, "nextSceneId": null或场景ID}，
                 严禁把 continuity 输出为“开篇场景”“承接上一幕”等自然语言字符串。
                 heading.setting 只能是 INT、EXT、INT/EXT；time 只能是 DAWN、DAY、DUSK、NIGHT、CONTINUOUS、UNKNOWN。
@@ -356,6 +358,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 7. 每场 purpose 要说明冲突、信息揭示或人物变化，不能只写地点概述。
                 8. sourceFidelity.evidence 使用不超过 80 字的原文依据。
                 9. 输出的是详细可编辑初稿，不是故事梗概；不得只生成一两条概述性 beat。
+                10. 必须严格遵守用户消息中的场景级媒介结构，不能把四种剧本写成同一种节奏。
 
                 Beat 必须严格使用以下格式，禁止使用 action_description、speaker、content 等别名：
                 {"id":"beat_001_01","type":"action","characterId":null,"parenthetical":null,
@@ -387,6 +390,11 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                       "location":"地点名称",
                       "time":"DAY|NIGHT|DAWN|DUSK|CONTINUOUS|UNKNOWN",
                       "purpose":"冲突、揭示或人物变化",
+                      "sectionLabel":"该媒介的幕、段或钩子标记",
+                      "storyLine":"MAIN、A_STORY、B_STORY、C_STORY或ENSEMBLE",
+                      "dramaticFunction":"本场戏剧功能",
+                      "estimatedDurationSeconds":60,
+                      "productionNotes":["该媒介的制作或执行重点"],
                       "mustKeepActions":["必须保留的可见动作"],
                       "mustKeepDialogues":["必须保留或准确转述的关键原文对白"],
                       "characters":["char_001"],
@@ -396,6 +404,8 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 }
                 每个输入章节都必须恰好对应一个 chapters 项；
                 每章场景数量必须遵守用户消息中的媒介规格。
+                scenePlan 中的 sectionLabel、storyLine、dramaticFunction、
+                estimatedDurationSeconds、productionNotes 必须遵守用户消息中的场景级媒介结构。
                 场景按原文事件顺序排列，明确前后状态，避免跨章重复和人物瞬移。
                 引用只能使用 Story Bible 中已有 ID。原文没有对白时不要虚构长对白。
                 """;
@@ -428,6 +438,9 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 必须遵守的媒介规格：
                 %s
 
+                场景级媒介结构：
+                %s
+
                 已确认 Story Bible：
                 %s
 
@@ -442,6 +455,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 chapter.id(),
                 chapter.title(),
                 ScreenplayFormatProfiles.prompt(format),
+                ScreenplayFormatProfiles.sceneDesignPrompt(format),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(storyBible),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(adaptationPlan),
                 chapter.content());
@@ -460,6 +474,9 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 必须遵守的媒介规格：
                 %s
 
+                场景级媒介结构：
+                %s
+
                 Story Bible：
                 %s
 
@@ -469,6 +486,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 title,
                 ScreenplayFormatProfiles.normalize(format),
                 ScreenplayFormatProfiles.prompt(format),
+                ScreenplayFormatProfiles.sceneDesignPrompt(format),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(storyBible),
                 chapterSource(chapters));
     }
@@ -555,6 +573,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
         }
 
         objectRoot.put("schemaVersion", "1.0");
+        String normalizedFormat = ScreenplayFormatProfiles.normalize(format);
         normalizeProject(objectRoot, title, format, chapterCount);
         ensureArray(objectRoot, "characters");
         ensureArray(objectRoot, "locations");
@@ -584,6 +603,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
             putDefaultText(scene, "purpose", "推进故事情节");
             normalizeReferenceArray(scene, "characters", characterReferences);
             normalizeReferenceArray(scene, "props", propReferences);
+            normalizeFormatDesign(scene, normalizedFormat, index, scenes.size());
             normalizeBeats(scene, index, characterReferences);
 
             String previousId = index == 0 ? null : sceneIdAt(scenes, index - 1);
@@ -619,6 +639,64 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 fidelity.put("inventedContent", false);
             }
         }
+    }
+
+    private void normalizeFormatDesign(
+            ObjectNode scene,
+            String format,
+            int index,
+            int totalScenes
+    ) {
+        Screenplay.FormatDesign fallback = ScreenplayFormatProfiles.sceneDesign(
+                format, index, totalScenes);
+        ObjectNode design;
+        JsonNode designNode = scene.get("formatDesign");
+        if (designNode instanceof ObjectNode objectDesign) {
+            design = objectDesign;
+        } else {
+            design = objectMapper.createObjectNode();
+            scene.set("formatDesign", design);
+        }
+        String sectionLabel = design.path("sectionLabel").asText();
+        if (!matchesFormatSection(format, sectionLabel, index, totalScenes)) {
+            design.put("sectionLabel", fallback.sectionLabel());
+        }
+        putDefaultText(design, "storyLine", fallback.storyLine());
+        putDefaultText(design, "dramaticFunction", fallback.dramaticFunction());
+        int duration = design.path("estimatedDurationSeconds").asInt(
+                fallback.estimatedDurationSeconds());
+        int maximum = "web_series".equals(format) ? 120 : 3600;
+        design.put("estimatedDurationSeconds", Math.max(10, Math.min(duration, maximum)));
+        JsonNode notesNode = design.get("productionNotes");
+        if (!(notesNode instanceof ArrayNode notes) || notes.isEmpty()) {
+            design.set("productionNotes", objectMapper.valueToTree(fallback.productionNotes()));
+        }
+    }
+
+    private boolean matchesFormatSection(
+            String format,
+            String sectionLabel,
+            int index,
+            int totalScenes
+    ) {
+        if (sectionLabel == null || sectionLabel.isBlank()) {
+            return false;
+        }
+        String normalized = sectionLabel.toUpperCase();
+        return switch (format) {
+            case "film" -> sectionLabel.contains("幕") || normalized.contains("ACT");
+            case "tv_series" -> normalized.contains("TEASER")
+                    || normalized.contains("ACT")
+                    || normalized.contains("TAG");
+            case "stage_play" -> sectionLabel.contains("幕") && sectionLabel.contains("场");
+            default -> index == 0
+                    ? normalized.contains("HOOK")
+                    : index == totalScenes - 1
+                    ? normalized.contains("CLIFFHANGER")
+                    : normalized.contains("ESCALATION")
+                    || normalized.contains("REVERSAL")
+                    || normalized.contains("PAYOFF");
+        };
     }
 
     private void normalizeProject(ObjectNode root, String title, String format, int chapterCount) {

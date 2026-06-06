@@ -117,6 +117,9 @@ public class ConversionService {
                     scene.purpose(),
                     scene.characters() == null ? List.of() : scene.characters(),
                     scene.props() == null ? List.of() : scene.props(),
+                    scene.formatDesign() == null
+                            ? ScreenplayFormatProfiles.sceneDesign(format, index, sourceScenes.size())
+                            : scene.formatDesign(),
                     beats,
                     new Screenplay.Continuity(
                             index == 0 ? null : "scene_%03d".formatted(index),

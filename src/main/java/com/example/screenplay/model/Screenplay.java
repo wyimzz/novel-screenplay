@@ -66,9 +66,19 @@ public record Screenplay(
             String purpose,
             List<String> characters,
             List<String> props,
+            FormatDesign formatDesign,
             List<Beat> beats,
             Continuity continuity,
             SourceFidelity sourceFidelity
+    ) {
+    }
+
+    public record FormatDesign(
+            String sectionLabel,
+            String storyLine,
+            String dramaticFunction,
+            int estimatedDurationSeconds,
+            List<String> productionNotes
     ) {
     }
 
