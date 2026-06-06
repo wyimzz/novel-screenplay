@@ -75,7 +75,7 @@ function updateChapterHint() {
 }
 
 function setPipeline(stage) {
-  const order = ["source", "assets", "scenes", "yaml"];
+  const order = ["source", "assets", "plan", "scenes", "yaml"];
   const current = order.indexOf(stage);
   document.querySelectorAll(".pipeline-step").forEach((step) => {
     const index = order.indexOf(step.dataset.stage);
@@ -500,47 +500,56 @@ async function saveAiSettings() {
 
 async function convertNovel() {
   elements.convert.disabled = true;
-  let elapsedSeconds = 0;
-  elements.convert.textContent = "正在提取故事圣经…";
+  elements.convert.textContent = "正在创建任务…";
   setPipeline("source");
-  const progressTimer = window.setInterval(() => {
-    elapsedSeconds += 1;
-    if (elapsedSeconds === 8) {
-      setPipeline("assets");
-      elements.convert.textContent = "正在规划场景…";
-    } else if (elapsedSeconds === 25) {
-      setPipeline("scenes");
-      elements.convert.textContent = "正在生成剧本…";
-    } else if (elapsedSeconds > 25) {
-      elements.convert.textContent = `正在生成剧本… ${elapsedSeconds}s`;
-    }
-  }, 1000);
-  const controller = new AbortController();
-  const requestTimeout = window.setTimeout(() => controller.abort(), 210000);
 
   try {
-    const response = await fetch("/api/screenplays/convert", {
+    const response = await fetch("/api/screenplays/jobs", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      signal: controller.signal,
       body: JSON.stringify({
         title: elements.title.value.trim(),
         content: elements.content.value,
         format: elements.format.value
       })
     });
-    const data = await response.json();
+    const job = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || "生成失败");
+      throw new Error(job.message || "创建生成任务失败");
     }
-    renderResult(data);
+    await waitForConversionJob(job.id);
   } catch (error) {
-    showError(error.name === "AbortError" ? "生成超过 3 分 30 秒，已停止等待。请缩短输入或检查模型连接。" : error.message);
+    showError(error.message);
   } finally {
-    window.clearInterval(progressTimer);
-    window.clearTimeout(requestTimeout);
     elements.convert.disabled = false;
     elements.convert.textContent = "开始改编";
+  }
+}
+
+async function waitForConversionJob(jobId) {
+  const startedAt = Date.now();
+  while (true) {
+    const response = await fetch(`/api/screenplays/jobs/${encodeURIComponent(jobId)}`, {
+      cache: "no-store"
+    });
+    const job = await response.json();
+    if (!response.ok) {
+      throw new Error(job.message || "读取生成进度失败");
+    }
+
+    setPipeline(job.stage || "source");
+    const elapsed = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+    elements.convert.textContent =
+      `${job.message || "正在处理"} · ${job.percent || 0}% · ${elapsed}s`;
+
+    if (job.status === "COMPLETED") {
+      renderResult(job.result);
+      return;
+    }
+    if (job.status === "FAILED") {
+      throw new Error(job.error || "AI 生成失败");
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
   }
 }
 

@@ -3,6 +3,7 @@ package com.example.screenplay.service;
 import com.example.screenplay.model.Chapter;
 import com.example.screenplay.model.ConversionRequest;
 import com.example.screenplay.model.ConversionResult;
+import com.example.screenplay.model.GenerationProgress;
 import com.example.screenplay.model.Screenplay;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 @Service
 public class ConversionService {
@@ -35,10 +37,34 @@ public class ConversionService {
     }
 
     public ConversionResult convert(ConversionRequest request) {
+        return convert(request, progress -> {
+        });
+    }
+
+    public ConversionResult convert(
+            ConversionRequest request,
+            Consumer<GenerationProgress> progress
+    ) {
+        progress.accept(new GenerationProgress("source", "正在解析小说章节", 5));
         List<Chapter> chapters = chapterParser.parse(request.content());
-        Screenplay screenplay = generator.generate(request.title(), request.format(), chapters);
+        progress.accept(new GenerationProgress(
+                "source",
+                "已识别 " + chapters.size() + " 个章节",
+                10));
+        Screenplay screenplay = generator.generate(
+                request.title(),
+                request.format(),
+                chapters,
+                progress);
+        progress.accept(new GenerationProgress("yaml", "正在校验结构并生成 YAML", 95));
         List<String> messages = validator.validate(screenplay);
-        return new ConversionResult(generator.mode(), screenplay, toYaml(screenplay), messages);
+        ConversionResult result = new ConversionResult(
+                generator.mode(),
+                screenplay,
+                toYaml(screenplay),
+                messages);
+        progress.accept(new GenerationProgress("yaml", "剧本初稿生成完成", 100));
+        return result;
     }
 
     public ConversionResult serialize(Screenplay screenplay) {
