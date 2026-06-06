@@ -45,8 +45,11 @@ const settingsElements = {
   close: document.querySelector("#closeSettingsBtn"),
   dialog: document.querySelector("#settingsDialog"),
   fields: document.querySelector("#aiFields"),
+  provider: document.querySelector("#aiProvider"),
   baseUrl: document.querySelector("#aiBaseUrl"),
   model: document.querySelector("#aiModel"),
+  modelOptions: document.querySelector("#aiModelOptions"),
+  modelHint: document.querySelector("#modelHint"),
   apiKey: document.querySelector("#aiApiKey"),
   apiKeyHint: document.querySelector("#apiKeyHint"),
   timeout: document.querySelector("#aiTimeout"),
@@ -54,6 +57,51 @@ const settingsElements = {
   save: document.querySelector("#saveAiBtn"),
   result: document.querySelector("#connectionResult"),
   runtimeStatus: document.querySelector("#runtimeStatus")
+};
+
+const aiProviders = {
+  deepseek: {
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    models: ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-chat"],
+    hint: "适合中文长文本改编；使用 DeepSeek API Key"
+  },
+  zhipu: {
+    label: "智谱 GLM",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    models: ["glm-5", "glm-4.7", "glm-4.5-air", "glm-4-flash"],
+    hint: "使用智谱开放平台 API Key；模型 ID 可按控制台实际可用项修改"
+  },
+  qwen: {
+    label: "通义千问 Qwen",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    models: ["qwen3.5-plus", "qwen-plus", "qwen-turbo", "qwen-long"],
+    hint: "使用阿里云百炼 DashScope API Key"
+  },
+  moonshot: {
+    label: "Moonshot / Kimi",
+    baseUrl: "https://api.moonshot.cn/v1",
+    models: ["kimi-k2.5", "moonshot-v1-128k", "moonshot-v1-32k"],
+    hint: "使用 Moonshot 开放平台 API Key"
+  },
+  openai: {
+    label: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    models: ["gpt-4.1", "gpt-4.1-mini", "gpt-4o"],
+    hint: "使用 OpenAI API Key；建议选择支持 Chat Completions 的模型"
+  },
+  ollama: {
+    label: "Ollama 本地模型",
+    baseUrl: "http://localhost:11434/v1",
+    models: ["qwen3:8b", "deepseek-r1:8b", "glm4:9b", "llama3.1:8b"],
+    hint: "无需 API Key，但需要先在本机启动 Ollama 并拉取对应模型"
+  },
+  custom: {
+    label: "自定义兼容接口",
+    baseUrl: "",
+    models: [],
+    hint: "填写提供 OpenAI Chat Completions 兼容接口的 Base URL 与模型 ID"
+  }
 };
 
 let latestYaml = "";
@@ -398,11 +446,33 @@ function showError(message) {
 function aiSettingsPayload() {
   return {
     enabled: aiEnabled,
+    provider: settingsElements.provider.value,
     baseUrl: settingsElements.baseUrl.value.trim(),
     apiKey: settingsElements.apiKey.value.trim(),
     model: settingsElements.model.value,
     timeoutSeconds: Number(settingsElements.timeout.value)
   };
+}
+
+function renderModelOptions(providerId, selectedModel, updateEndpoint = true) {
+  const provider = aiProviders[providerId] || aiProviders.custom;
+  settingsElements.modelOptions.innerHTML = provider.models
+    .map((model) => `<option value="${escapeHtml(model)}"></option>`)
+    .join("");
+  settingsElements.modelHint.textContent = provider.hint;
+  if (updateEndpoint) {
+    settingsElements.baseUrl.value = provider.baseUrl;
+  }
+  if (selectedModel) {
+    settingsElements.model.value = selectedModel;
+  } else if (provider.models.length) {
+    settingsElements.model.value = provider.models[0];
+  } else {
+    settingsElements.model.value = "";
+  }
+  settingsElements.apiKey.placeholder = providerId === "ollama"
+    ? "本地 Ollama 无需填写"
+    : `输入 ${provider.label} API Key`;
 }
 
 function setAiMode(enabled) {
@@ -431,8 +501,9 @@ async function loadAiSettings() {
     if (!response.ok) throw new Error("读取 AI 设置失败");
     const settings = await response.json();
     setAiMode(settings.enabled);
+    settingsElements.provider.value = settings.providerId || "custom";
     settingsElements.baseUrl.value = settings.baseUrl;
-    settingsElements.model.value = settings.model;
+    renderModelOptions(settingsElements.provider.value, settings.model, false);
     settingsElements.timeout.value = settings.timeoutSeconds;
     settingsElements.apiKey.value = "";
     settingsElements.apiKeyHint.textContent = settings.apiKeyConfigured
@@ -596,6 +667,13 @@ document.querySelectorAll(".tab").forEach((tab) => {
 });
 document.querySelectorAll(".mode-option").forEach((option) => {
   option.addEventListener("click", () => setAiMode(option.dataset.mode === "deepseek"));
+});
+settingsElements.provider.addEventListener("change", () => {
+  renderModelOptions(settingsElements.provider.value, "", true);
+  settingsElements.apiKey.value = "";
+  settingsElements.apiKeyHint.textContent = settingsElements.provider.value === "ollama"
+    ? "本地接口无需 Key"
+    : "切换服务商后请输入对应 API Key";
 });
 settingsElements.open.addEventListener("click", () => {
   settingsElements.dialog.classList.remove("hidden");

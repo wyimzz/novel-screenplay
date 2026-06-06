@@ -6,6 +6,7 @@ import com.example.screenplay.model.AiSettingsRequest;
 import com.example.screenplay.model.AiSettingsView;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -26,10 +27,21 @@ import java.util.Map;
 public class AiSettingsService {
 
     private final ObjectMapper objectMapper;
+    private final boolean persistSettings;
     private volatile RuntimeAiSettings settings;
 
+    @Autowired
     public AiSettingsService(AiModelProperties properties, ObjectMapper objectMapper) {
+        this(properties, objectMapper, true);
+    }
+
+    AiSettingsService(
+            AiModelProperties properties,
+            ObjectMapper objectMapper,
+            boolean persistSettings
+    ) {
         this.objectMapper = objectMapper;
+        this.persistSettings = persistSettings;
         this.settings = new RuntimeAiSettings(
                 properties.enabled(),
                 properties.baseUrl(),
@@ -46,6 +58,7 @@ public class AiSettingsService {
         RuntimeAiSettings current = settings;
         return new AiSettingsView(
                 current.enabled(),
+                detectProviderId(current.baseUrl()),
                 detectProvider(current.baseUrl()),
                 current.baseUrl(),
                 current.model(),
@@ -55,25 +68,25 @@ public class AiSettingsService {
     }
 
     public synchronized AiSettingsView update(AiSettingsRequest request) {
-        String key = request.apiKey() == null || request.apiKey().isBlank()
-                ? settings.apiKey()
-                : request.apiKey().trim();
+        String normalizedBaseUrl = normalizeBaseUrl(request.baseUrl());
+        String key = resolveKey(request, normalizedBaseUrl);
         RuntimeAiSettings updated = new RuntimeAiSettings(
                 request.enabled(),
-                normalizeBaseUrl(request.baseUrl()),
+                normalizedBaseUrl,
                 key,
                 request.model().trim(),
                 request.timeoutSeconds());
         settings = updated;
-        persist(updated);
+        if (persistSettings) {
+            persist(updated);
+        }
         return view();
     }
 
     public AiConnectionTestResult test(AiSettingsRequest request) {
-        String key = request.apiKey() == null || request.apiKey().isBlank()
-                ? settings.apiKey()
-                : request.apiKey().trim();
-        if (key == null || key.isBlank()) {
+        String normalizedBaseUrl = normalizeBaseUrl(request.baseUrl());
+        String key = resolveKey(request, normalizedBaseUrl);
+        if ((key == null || key.isBlank()) && !isLocalEndpoint(normalizedBaseUrl)) {
             return new AiConnectionTestResult(false, "请先填写 API Key", 0);
         }
 
@@ -83,20 +96,21 @@ public class AiSettingsService {
             payload.put("model", request.model().trim());
             payload.put("max_tokens", 8);
             payload.put("temperature", 0);
-            payload.put("thinking", Map.of("type", "disabled"));
+            addProviderOptions(payload, request.baseUrl(), request.model());
             payload.put("messages", List.of(Map.of("role", "user", "content", "只回复 OK")));
 
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(15))
                     .build();
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(normalizeBaseUrl(request.baseUrl()) + "/chat/completions"))
+            HttpRequest.Builder httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(normalizedBaseUrl + "/chat/completions"))
                     .timeout(Duration.ofSeconds(Math.min(Math.max(request.timeoutSeconds(), 15), 60)))
-                    .header("Authorization", "Bearer " + key)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
-                    .build();
-            HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)));
+            if (!key.isBlank()) {
+                httpRequest.header("Authorization", "Bearer " + key);
+            }
+            HttpResponse<String> response = client.send(httpRequest.build(), HttpResponse.BodyHandlers.ofString());
             long latency = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 return new AiConnectionTestResult(true, "连接成功", latency);
@@ -145,7 +159,47 @@ public class AiSettingsService {
     }
 
     private String detectProvider(String baseUrl) {
-        return baseUrl != null && baseUrl.toLowerCase().contains("deepseek") ? "DeepSeek" : "OpenAI Compatible";
+        return switch (detectProviderId(baseUrl)) {
+            case "deepseek" -> "DeepSeek";
+            case "zhipu" -> "智谱 GLM";
+            case "qwen" -> "通义千问";
+            case "moonshot" -> "Moonshot / Kimi";
+            case "openai" -> "OpenAI";
+            case "ollama" -> "Ollama 本地模型";
+            default -> "OpenAI Compatible";
+        };
+    }
+
+    private String resolveKey(AiSettingsRequest request, String normalizedBaseUrl) {
+        if (request.apiKey() != null && !request.apiKey().isBlank()) {
+            return request.apiKey().trim();
+        }
+        boolean providerChanged = !normalizedBaseUrl.equalsIgnoreCase(settings.baseUrl());
+        return providerChanged ? "" : settings.apiKey();
+    }
+
+    private boolean isLocalEndpoint(String baseUrl) {
+        String value = baseUrl == null ? "" : baseUrl.toLowerCase();
+        return value.contains("localhost") || value.contains("127.0.0.1");
+    }
+
+    private String detectProviderId(String baseUrl) {
+        String value = baseUrl == null ? "" : baseUrl.toLowerCase();
+        if (value.contains("deepseek")) return "deepseek";
+        if (value.contains("bigmodel.cn")) return "zhipu";
+        if (value.contains("dashscope")) return "qwen";
+        if (value.contains("moonshot")) return "moonshot";
+        if (value.contains("api.openai.com")) return "openai";
+        if (value.contains("localhost:11434") || value.contains("127.0.0.1:11434")) return "ollama";
+        return "custom";
+    }
+
+    private void addProviderOptions(Map<String, Object> payload, String baseUrl, String model) {
+        if (detectProviderId(baseUrl).equals("deepseek")
+                && model != null
+                && model.toLowerCase().startsWith("deepseek")) {
+            payload.put("thinking", Map.of("type", "disabled"));
+        }
     }
 
     private String normalizeBaseUrl(String baseUrl) {
@@ -161,7 +215,9 @@ public class AiSettingsService {
             int timeoutSeconds
     ) {
         public boolean available() {
-            return enabled && apiKey != null && !apiKey.isBlank();
+            String url = baseUrl == null ? "" : baseUrl.toLowerCase();
+            boolean local = url.contains("localhost") || url.contains("127.0.0.1");
+            return enabled && (local || apiKey != null && !apiKey.isBlank());
         }
     }
 }

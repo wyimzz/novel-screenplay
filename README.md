@@ -62,6 +62,8 @@ powershell -ExecutionPolicy Bypass -File .\run-deepseek.ps1 -Port 8090
 - 识别“第一章”和 `Chapter 1` 等章节标题
 - 强制至少 3 章输入
 - DeepSeek 分阶段生成：Story Bible -> 全书改编蓝图 -> 分章详细剧本 -> 全局合并
+- AI 服务商切换：DeepSeek、智谱 GLM、通义千问、Moonshot/Kimi、OpenAI、Ollama 与自定义兼容接口
+- 模型 ID 可自由编辑，预设仅用于快速填写，不限制厂商新增模型
 - 后台生成任务与真实阶段进度，刷新页面请求不会长期占用单个 HTTP 连接
 - AI JSON 异常时自动截取有效对象并执行一次结构修复
 - 人物、地点、道具稳定 ID
@@ -71,6 +73,8 @@ powershell -ExecutionPolicy Bypass -File .\run-deepseek.ps1 -Port 8090
 - 可视化场景/Beat 块编辑、自动重新编号、YAML 下载
 - AI 失败时明确显示错误，不静默伪装成 AI 结果
 - 无 API Key 时可使用离线规则模式演示
+
+切换云端服务商时需要填写对应平台的 API Key。为避免误把旧服务商的 Key 发送给新地址，修改 API 地址且未填写新 Key 时，系统会主动清空已保存的 Key。本地 Ollama 默认使用 `http://localhost:11434/v1`，无需 API Key。
 
 ## 文档
 

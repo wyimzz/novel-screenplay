@@ -143,23 +143,34 @@
         <span>无需 API，适合演示结构</span>
       </button>
       <button class="mode-option active" type="button" data-mode="deepseek">
-        <strong>DeepSeek</strong>
-        <span>使用大模型完成真实改编</span>
+        <strong>AI 模型</strong>
+        <span>DeepSeek、GLM、Qwen、Kimi 等</span>
       </button>
     </div>
 
     <div id="aiFields" class="settings-fields">
       <label>
+        <span>服务商</span>
+        <select id="aiProvider">
+          <option value="deepseek">DeepSeek</option>
+          <option value="zhipu">智谱 GLM</option>
+          <option value="qwen">通义千问 Qwen</option>
+          <option value="moonshot">Moonshot / Kimi</option>
+          <option value="openai">OpenAI</option>
+          <option value="ollama">Ollama 本地模型</option>
+          <option value="custom">自定义兼容接口</option>
+        </select>
+      </label>
+      <label>
         <span>API 地址</span>
         <input id="aiBaseUrl" value="https://api.deepseek.com">
       </label>
       <label>
-        <span>模型</span>
-        <select id="aiModel">
-            <option value="deepseek-v4-flash">deepseek-v4-flash（速度优先）</option>
-            <option value="deepseek-v4-pro">deepseek-v4-pro（质量优先）</option>
-            <option value="deepseek-chat">deepseek-chat（兼容模型）</option>
-        </select>
+        <span>模型 ID</span>
+        <input id="aiModel" list="aiModelOptions" value="deepseek-v4-flash"
+               placeholder="选择建议模型或输入厂商模型 ID">
+        <datalist id="aiModelOptions"></datalist>
+        <small id="modelHint">可直接输入服务商支持的其他模型 ID</small>
       </label>
       <label>
         <span>API Key</span>
