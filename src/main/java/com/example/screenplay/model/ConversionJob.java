@@ -6,6 +6,7 @@ public record ConversionJob(
         String stage,
         String message,
         int percent,
+        Screenplay preview,
         ConversionResult result,
         String error
 ) {

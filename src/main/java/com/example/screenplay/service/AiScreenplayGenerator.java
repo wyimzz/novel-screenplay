@@ -17,16 +17,17 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 @Component
 public class AiScreenplayGenerator implements ScreenplayGenerator {
@@ -86,6 +87,13 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                     storyBible,
                     "Story Bible 必须是包含 characters、locations、props 的 JSON 对象");
             normalizeStoryBible(storyBibleNode, chapters);
+            Screenplay assetPreview = buildPreview(
+                    title, format, chapters, storyBibleNode, List.of());
+            progress.accept(new GenerationProgress(
+                    "assets",
+                    "故事圣经已完成，正在规划场景",
+                    25,
+                    assetPreview));
 
             progress.accept(new GenerationProgress("plan", "正在规划全书场景与戏剧节奏", 32));
             String adaptationPlan = callModel(
@@ -134,55 +142,35 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 settings.model(), chapters.size());
 
         int concurrency = Math.min(3, chapters.size());
-        AtomicInteger completed = new AtomicInteger();
         progress.accept(new GenerationProgress("scenes", "正在生成各章动作与对白", 42));
-        List<Callable<JsonNode>> tasks = chapters.stream()
-                .<Callable<JsonNode>>map(chapter -> () -> generateChapterDraft(
-                        settings, title, format, chapter, storyBible, adaptationPlan, () -> {
-                            int done = completed.incrementAndGet();
-                            int percent = 42 + (int) Math.round(done * 48.0 / chapters.size());
-                            progress.accept(new GenerationProgress(
-                                    "scenes",
-                                    "已完成 " + done + " / " + chapters.size() + " 章详细剧本",
-                                    percent));
-                        }))
-                .toList();
-
-        ObjectNode combined = objectMapper.createObjectNode();
-        combined.put("schemaVersion", "1.0");
-        combined.set("characters", storyBible.path("characters").deepCopy());
-        combined.set("locations", storyBible.path("locations").deepCopy());
-        combined.set("props", storyBible.path("props").deepCopy());
-        ArrayNode scenes = combined.putArray("scenes");
-        ArrayNode notes = combined.putArray("adaptationNotes");
+        List<ChapterDraft> completedDrafts = new ArrayList<>();
 
         try (ExecutorService executor = Executors.newFixedThreadPool(concurrency)) {
-            List<Future<JsonNode>> futures = executor.invokeAll(tasks);
-            for (int index = 0; index < futures.size(); index++) {
-                JsonNode chapterDraft = futures.get(index).get();
+            CompletionService<ChapterDraft> completionService = new ExecutorCompletionService<>(executor);
+            for (int index = 0; index < chapters.size(); index++) {
+                int chapterIndex = index;
                 Chapter chapter = chapters.get(index);
-                JsonNode chapterScenes = chapterDraft.path("scenes");
-                if (chapterScenes.isArray()) {
-                    for (JsonNode sceneNode : chapterScenes) {
-                        if (sceneNode instanceof ObjectNode scene) {
-                            normalizeStringArray(scene, "sourceChapterIds", chapter.id());
-                            scenes.add(scene);
-                        }
-                    }
-                }
-                JsonNode chapterNotes = chapterDraft.path("adaptationNotes");
-                if (chapterNotes.isArray()) {
-                    chapterNotes.forEach(notes::add);
-                }
+                completionService.submit(() -> new ChapterDraft(
+                        chapterIndex,
+                        chapter,
+                        generateChapterDraft(settings, title, format, chapter, storyBible, adaptationPlan)));
+            }
+            for (int done = 1; done <= chapters.size(); done++) {
+                completedDrafts.add(completionService.take().get());
+                completedDrafts.sort(Comparator.comparingInt(ChapterDraft::index));
+                int percent = 42 + (int) Math.round(done * 48.0 / chapters.size());
+                Screenplay preview = buildPreview(
+                        title, format, chapters, storyBible, completedDrafts);
+                progress.accept(new GenerationProgress(
+                        "scenes",
+                        "已完成 " + done + " / " + chapters.size() + " 章详细剧本",
+                        percent,
+                        preview));
             }
         }
 
         LOGGER.info("AI detailed chapter adaptation completed in {} ms", elapsedMillis(startedAt));
-        return parseScreenplayContent(
-                objectMapper.writeValueAsString(combined),
-                title,
-                format,
-                chapters.size());
+        return buildPreview(title, format, chapters, storyBible, completedDrafts);
     }
 
     private JsonNode generateChapterDraft(
@@ -191,8 +179,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
             String format,
             Chapter chapter,
             JsonNode storyBible,
-            JsonNode adaptationPlan,
-            Runnable completed
+            JsonNode adaptationPlan
     ) throws IOException, InterruptedException {
         long startedAt = System.nanoTime();
         String content = callModel(
@@ -207,8 +194,49 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 settings,
                 content,
                 "章节剧本必须是包含 scenes、adaptationNotes 的 JSON 对象");
-        completed.run();
         return result;
+    }
+
+    private Screenplay buildPreview(
+            String title,
+            String format,
+            List<Chapter> chapters,
+            JsonNode storyBible,
+            List<ChapterDraft> drafts
+    ) throws IOException {
+        ObjectNode combined = objectMapper.createObjectNode();
+        combined.put("schemaVersion", "1.0");
+        combined.set("characters", storyBible.path("characters").deepCopy());
+        combined.set("locations", storyBible.path("locations").deepCopy());
+        combined.set("props", storyBible.path("props").deepCopy());
+        ArrayNode scenes = combined.putArray("scenes");
+        ArrayNode notes = combined.putArray("adaptationNotes");
+
+        for (ChapterDraft draft : drafts) {
+            JsonNode chapterScenes = draft.content().path("scenes");
+            if (chapterScenes.isArray()) {
+                for (JsonNode sceneNode : chapterScenes) {
+                    if (sceneNode instanceof ObjectNode scene) {
+                        ObjectNode sceneCopy = scene.deepCopy();
+                        normalizeStringArray(sceneCopy, "sourceChapterIds", draft.chapter().id());
+                        scenes.add(sceneCopy);
+                    }
+                }
+            }
+            JsonNode chapterNotes = draft.content().path("adaptationNotes");
+            if (chapterNotes.isArray()) {
+                chapterNotes.forEach(note -> notes.add(note.deepCopy()));
+            }
+        }
+
+        return parseScreenplayContent(
+                objectMapper.writeValueAsString(combined),
+                title,
+                format,
+                chapters.size());
+    }
+
+    private record ChapterDraft(int index, Chapter chapter, JsonNode content) {
     }
 
     private JsonNode parseOrRepairJson(

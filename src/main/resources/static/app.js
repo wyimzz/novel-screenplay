@@ -110,6 +110,8 @@ let latestScreenplay = null;
 let aiEnabled = true;
 let editorDraft = null;
 let selectedSceneIndex = 0;
+let previewVisible = false;
+let previewSceneCount = 0;
 
 function countChapters() {
   const pattern = /^\s*(第[零〇一二两三四五六七八九十百千0-9]+章|Chapter\s+\d+)/gmi;
@@ -183,8 +185,14 @@ function beatLabel(type) {
 }
 
 function renderScenes(screenplay) {
-  const characterNames = Object.fromEntries(screenplay.characters.map((item) => [item.id, item.name]));
-  elements.scenes.innerHTML = screenplay.scenes.map((scene, index) => `
+  const characters = screenplay.characters || [];
+  const scenes = screenplay.scenes || [];
+  const characterNames = Object.fromEntries(characters.map((item) => [item.id, item.name]));
+  if (!scenes.length) {
+    elements.scenes.innerHTML = '<div class="asset-empty">章节剧本生成后，动作与对白会逐章出现在这里</div>';
+    return;
+  }
+  elements.scenes.innerHTML = scenes.map((scene, index) => `
     <article class="scene-item">
       <div class="scene-header">
         <div class="scene-number">${String(index + 1).padStart(2, "0")}</div>
@@ -224,6 +232,52 @@ function renderScenes(screenplay) {
   `).join("");
 }
 
+function renderPreview(screenplay, stage, message) {
+  if (!screenplay) return;
+  const characters = screenplay.characters || [];
+  const locations = screenplay.locations || [];
+  const props = screenplay.props || [];
+  const scenes = screenplay.scenes || [];
+  const firstPreview = !previewVisible;
+  const receivedNewScenes = scenes.length > previewSceneCount;
+
+  latestYaml = "";
+  latestScreenplay = null;
+  elements.projectTitle.textContent = screenplay.project?.title || "剧本初稿";
+  elements.validation.textContent = `生成中 · ${message || "正在处理"}`;
+  elements.validation.classList.remove("error");
+  elements.output.textContent = "YAML 将在全部章节生成并通过结构校验后显示。";
+  elements.metrics.innerHTML = [
+    renderMetric("源章节", screenplay.project?.sourceChapterCount || 0),
+    renderMetric("人物", characters.length),
+    renderMetric("地点", locations.length),
+    renderMetric("道具", props.length),
+    renderMetric("已生成场景", scenes.length)
+  ].join("");
+  renderFormatProfile(screenplay.project || {});
+
+  elements.characterCount.textContent = characters.length;
+  elements.locationCount.textContent = locations.length;
+  elements.propCount.textContent = props.length;
+  renderAsset(elements.characters, characters, "character");
+  renderAsset(elements.locations, locations, "location");
+  renderAsset(elements.props, props, "prop");
+  renderScenes(screenplay);
+
+  elements.empty.classList.add("hidden");
+  elements.result.classList.remove("hidden");
+  elements.download.disabled = true;
+  elements.edit.disabled = true;
+  previewVisible = true;
+  previewSceneCount = scenes.length;
+
+  if (firstPreview) {
+    switchTab("assets");
+  } else if (receivedNewScenes && stage === "scenes") {
+    switchTab("scenes");
+  }
+}
+
 function renderResult(data) {
   latestYaml = data.yaml;
   latestScreenplay = data.screenplay;
@@ -255,6 +309,8 @@ function renderResult(data) {
   elements.result.classList.remove("hidden");
   elements.download.disabled = false;
   elements.edit.disabled = false;
+  previewVisible = false;
+  previewSceneCount = screenplay.scenes.length;
   setPipeline("yaml");
   switchTab("assets");
 }
@@ -606,6 +662,12 @@ async function saveAiSettings() {
 async function convertNovel() {
   elements.convert.disabled = true;
   elements.convert.textContent = "正在创建任务…";
+  previewVisible = false;
+  previewSceneCount = 0;
+  latestYaml = "";
+  latestScreenplay = null;
+  elements.edit.disabled = true;
+  elements.download.disabled = true;
   setPipeline("source");
 
   try {
@@ -647,6 +709,9 @@ async function waitForConversionJob(jobId) {
     elements.convert.textContent =
       `${job.message || "正在处理"} · ${job.percent || 0}% · ${elapsed}s`;
 
+    if (job.preview && job.status !== "COMPLETED") {
+      renderPreview(job.preview, job.stage, job.message);
+    }
     if (job.status === "COMPLETED") {
       renderResult(job.result);
       return;
