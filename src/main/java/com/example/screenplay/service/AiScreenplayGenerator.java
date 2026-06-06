@@ -1,6 +1,7 @@
 package com.example.screenplay.service;
 
 import com.example.screenplay.model.Chapter;
+import com.example.screenplay.model.GenerationProgress;
 import com.example.screenplay.model.Screenplay;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -19,6 +20,8 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -48,6 +51,17 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
 
     @Override
     public Screenplay generate(String title, String format, List<Chapter> chapters) {
+        return generate(title, format, chapters, progress -> {
+        });
+    }
+
+    @Override
+    public Screenplay generate(
+            String title,
+            String format,
+            List<Chapter> chapters,
+            Consumer<GenerationProgress> progress
+    ) {
         if (!available()) {
             throw new IllegalStateException("AI 模型尚未配置");
         }
@@ -55,6 +69,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
 
         try {
             String source = chapterSource(chapters);
+            progress.accept(new GenerationProgress("assets", "正在提取人物、地点和关键道具", 15));
             long extractionStarted = System.nanoTime();
             LOGGER.info("AI Story Bible extraction started: model={}, chapters={}",
                     settings.model(), chapters.size());
@@ -66,15 +81,33 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                     3000);
             LOGGER.info("AI Story Bible extraction completed in {} ms",
                     elapsedMillis(extractionStarted));
-            JsonNode storyBibleNode = objectMapper.readTree(stripCodeFence(storyBible));
+            JsonNode storyBibleNode = parseOrRepairJson(
+                    settings,
+                    storyBible,
+                    "Story Bible 必须是包含 characters、locations、props 的 JSON 对象");
             normalizeStoryBible(storyBibleNode, chapters);
+
+            progress.accept(new GenerationProgress("plan", "正在规划全书场景与戏剧节奏", 32));
+            String adaptationPlan = callModel(
+                    settings,
+                    adaptationPlanPrompt(),
+                    adaptationPlanUserPrompt(title, format, chapters, storyBibleNode),
+                    0.15,
+                    4000);
+            JsonNode adaptationPlanNode = parseOrRepairJson(
+                    settings,
+                    adaptationPlan,
+                    "改编蓝图必须是包含 chapters 数组的 JSON 对象");
+            normalizeAdaptationPlan(adaptationPlanNode, chapters);
 
             Screenplay screenplay = generateChapterDrafts(
                     settings,
                     title,
                     format,
                     chapters,
-                    storyBibleNode);
+                    storyBibleNode,
+                    adaptationPlanNode,
+                    progress);
             return mergeStoryBible(screenplay, storyBibleNode);
         } catch (IOException exception) {
             throw new IllegalStateException("AI 响应解析失败：" + exception.getMessage(), exception);
@@ -92,16 +125,27 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
             String title,
             String format,
             List<Chapter> chapters,
-            JsonNode storyBible
+            JsonNode storyBible,
+            JsonNode adaptationPlan,
+            Consumer<GenerationProgress> progress
     ) throws IOException, InterruptedException, ExecutionException {
         long startedAt = System.nanoTime();
         LOGGER.info("AI detailed chapter adaptation started: model={}, chapters={}",
                 settings.model(), chapters.size());
 
         int concurrency = Math.min(3, chapters.size());
+        AtomicInteger completed = new AtomicInteger();
+        progress.accept(new GenerationProgress("scenes", "正在生成各章动作与对白", 42));
         List<Callable<JsonNode>> tasks = chapters.stream()
                 .<Callable<JsonNode>>map(chapter -> () -> generateChapterDraft(
-                        settings, title, format, chapter, storyBible))
+                        settings, title, format, chapter, storyBible, adaptationPlan, () -> {
+                            int done = completed.incrementAndGet();
+                            int percent = 42 + (int) Math.round(done * 48.0 / chapters.size());
+                            progress.accept(new GenerationProgress(
+                                    "scenes",
+                                    "已完成 " + done + " / " + chapters.size() + " 章详细剧本",
+                                    percent));
+                        }))
                 .toList();
 
         ObjectNode combined = objectMapper.createObjectNode();
@@ -146,18 +190,48 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
             String title,
             String format,
             Chapter chapter,
-            JsonNode storyBible
+            JsonNode storyBible,
+            JsonNode adaptationPlan,
+            Runnable completed
     ) throws IOException, InterruptedException {
         long startedAt = System.nanoTime();
         String content = callModel(
                 settings,
                 chapterScreenplayPrompt(),
-                chapterUserPrompt(title, format, chapter, storyBible),
+                chapterUserPrompt(title, format, chapter, storyBible, adaptationPlan),
                 0.2,
                 4500);
         LOGGER.info("AI chapter adaptation completed: chapter={}, elapsedMs={}",
                 chapter.id(), elapsedMillis(startedAt));
-        return objectMapper.readTree(stripCodeFence(content));
+        JsonNode result = parseOrRepairJson(
+                settings,
+                content,
+                "章节剧本必须是包含 scenes、adaptationNotes 的 JSON 对象");
+        completed.run();
+        return result;
+    }
+
+    private JsonNode parseOrRepairJson(
+            AiSettingsService.RuntimeAiSettings settings,
+            String content,
+            String requirement
+    ) throws IOException, InterruptedException {
+        try {
+            return objectMapper.readTree(extractJsonObject(content));
+        } catch (IOException firstFailure) {
+            LOGGER.warn("AI JSON parse failed, requesting one repair: {}", firstFailure.getMessage());
+            String repaired = callModel(
+                    settings,
+                    """
+                            你是 JSON 修复器。只输出修复后的完整 JSON 对象，不要 Markdown，不要解释。
+                            不得删减原响应中的有效剧情内容；修正代码围栏、前后说明、缺失引号、
+                            尾逗号、错误字段容器和未闭合结构。%s
+                            """.formatted(requirement),
+                    "待修复响应：\n" + content,
+                    0,
+                    5000);
+            return objectMapper.readTree(extractJsonObject(repaired));
+        }
     }
 
     private String callModel(
@@ -180,7 +254,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(normalizeBaseUrl(settings.baseUrl()) + "/chat/completions"))
-                .timeout(Duration.ofSeconds(Math.min(Math.max(settings.timeoutSeconds(), 30), 90)))
+                .timeout(Duration.ofSeconds(Math.min(Math.max(settings.timeoutSeconds(), 30), 600)))
                 .header("Authorization", "Bearer " + settings.apiKey())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(request)))
@@ -260,6 +334,37 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 """;
     }
 
+    private String adaptationPlanPrompt() {
+        return """
+                你是影视剧本统筹。基于完整小说和已确认 Story Bible，先制作全书改编蓝图，
+                不写最终对白，不输出 Markdown，只输出严格 JSON。
+                顶层结构必须是：
+                {
+                  "logline":"一句话主线",
+                  "dramaticArc":"全书戏剧推进说明",
+                  "chapters":[{
+                    "chapterId":"chapter_01",
+                    "summary":"本章关键事件与人物变化",
+                    "entryState":"本章开始时人物与信息状态",
+                    "exitState":"本章结束时人物与信息状态",
+                    "scenePlan":[{
+                      "order":1,
+                      "location":"地点名称",
+                      "time":"DAY|NIGHT|DAWN|DUSK|CONTINUOUS|UNKNOWN",
+                      "purpose":"冲突、揭示或人物变化",
+                      "mustKeepActions":["必须保留的可见动作"],
+                      "mustKeepDialogues":["必须保留或准确转述的关键原文对白"],
+                      "characters":["char_001"],
+                      "props":["prop_001"]
+                    }]
+                  }]
+                }
+                每个输入章节都必须恰好对应一个 chapters 项；每章规划 2 到 5 场。
+                场景按原文事件顺序排列，明确前后状态，避免跨章重复和人物瞬移。
+                引用只能使用 Story Bible 中已有 ID。原文没有对白时不要虚构长对白。
+                """;
+    }
+
     private String chapterSource(List<Chapter> chapters) {
         StringBuilder source = new StringBuilder();
         for (Chapter chapter : chapters) {
@@ -274,7 +379,8 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
             String title,
             String format,
             Chapter chapter,
-            JsonNode storyBible
+            JsonNode storyBible,
+            JsonNode adaptationPlan
     ) throws IOException {
         return """
                 作品名称：%s
@@ -286,6 +392,9 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 已确认 Story Bible：
                 %s
 
+                已确认全书改编蓝图：
+                %s
+
                 当前章节完整原文：
                 %s
                 """.formatted(
@@ -294,7 +403,30 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
                 chapter.id(),
                 chapter.title(),
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(storyBible),
+                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(adaptationPlan),
                 chapter.content());
+    }
+
+    private String adaptationPlanUserPrompt(
+            String title,
+            String format,
+            List<Chapter> chapters,
+            JsonNode storyBible
+    ) throws IOException {
+        return """
+                作品名称：%s
+                目标形式：%s
+
+                Story Bible：
+                %s
+
+                带稳定章节 ID 的完整原文：
+                %s
+                """.formatted(
+                title,
+                format,
+                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(storyBible),
+                chapterSource(chapters));
     }
 
     private String normalizeBaseUrl(String baseUrl) {
@@ -313,6 +445,49 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
             trimmed = trimmed.replaceFirst("\\s*```$", "");
         }
         return trimmed;
+    }
+
+    private String extractJsonObject(String content) {
+        String trimmed = stripCodeFence(content);
+        int start = trimmed.indexOf('{');
+        int end = trimmed.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return trimmed.substring(start, end + 1);
+        }
+        return trimmed;
+    }
+
+    private void normalizeAdaptationPlan(JsonNode root, List<Chapter> chapters) {
+        if (!(root instanceof ObjectNode plan)) {
+            throw new IllegalArgumentException("AI 返回的改编蓝图顶层必须是 JSON 对象");
+        }
+        JsonNode chapterPlansNode = plan.get("chapters");
+        ArrayNode chapterPlans = chapterPlansNode instanceof ArrayNode array
+                ? array
+                : objectMapper.createArrayNode();
+        Map<String, JsonNode> plansByChapter = new LinkedHashMap<>();
+        for (JsonNode chapterPlan : chapterPlans) {
+            String chapterId = chapterPlan.path("chapterId").asText();
+            if (!chapterId.isBlank()) {
+                plansByChapter.put(chapterId, chapterPlan);
+            }
+        }
+        ArrayNode normalized = objectMapper.createArrayNode();
+        for (Chapter chapter : chapters) {
+            JsonNode existing = plansByChapter.get(chapter.id());
+            ObjectNode chapterPlan = existing instanceof ObjectNode object
+                    ? object
+                    : objectMapper.createObjectNode();
+            chapterPlan.put("chapterId", chapter.id());
+            putDefaultText(chapterPlan, "summary", chapter.title());
+            putDefaultText(chapterPlan, "entryState", "承接前文状态");
+            putDefaultText(chapterPlan, "exitState", "进入下一章状态");
+            ensureArray(chapterPlan, "scenePlan");
+            normalized.add(chapterPlan);
+        }
+        plan.set("chapters", normalized);
+        putDefaultText(plan, "logline", "根据小说原文推进的影视改编");
+        putDefaultText(plan, "dramaticArc", "按章节顺序推进冲突与人物变化");
     }
 
     Screenplay parseScreenplayContent(String content) throws IOException {
