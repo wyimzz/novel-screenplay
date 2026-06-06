@@ -27,9 +27,20 @@ project:
   sourceLanguage: "zh-CN"
   format: "web_series"
   sourceChapterCount: 3
+  formatProfile:
+    targetDurationMinutes: 12
+    structure: "竖屏短剧单集：强钩子、快速升级、连续反转、卡点收尾"
+    pacing: "短场景、高信息密度，前置冲突并减少铺垫"
+    constraints:
+      - "开场前 10 秒必须出现异常、目标或直接冲突"
 ```
 
-`sourceChapterCount` 最小值为 3，对应题目要求。`format` 允许 `film`、`tv_series`、`web_series` 和 `stage_play`，使同一份小说输入可以按不同媒介重组节奏。
+`sourceChapterCount` 最小值为 3，对应题目要求。`format` 允许 `film`、`tv_series`、`web_series` 和 `stage_play`。`formatProfile` 把媒介选择转化为可检查的目标时长、结构、节奏和硬约束，而不是只保存一个标签。
+
+- `film`：约 110 分钟，三幕式完整闭环，强调电影化动作与空间。
+- `tv_series`：约 45 分钟单集，四幕推进并以集尾悬念承接后续。
+- `web_series`：约 12 分钟，前 10 秒建立钩子，高频反转并卡点收尾。
+- `stage_play`：约 100 分钟，减少换景，以对白、停顿和舞台调度推进。
 
 ## 4. Story Bible
 

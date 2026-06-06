@@ -99,8 +99,9 @@ public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
                 new Screenplay.Project(
                         title,
                         "zh-CN",
-                        format == null || format.isBlank() ? "web_series" : format,
-                        chapters.size()),
+                        ScreenplayFormatProfiles.normalize(format),
+                        chapters.size(),
+                        ScreenplayFormatProfiles.profile(format)),
                 characters,
                 locations,
                 props,

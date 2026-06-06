@@ -31,6 +31,8 @@ class ConversionServiceTest {
 
         assertThat(result.mode()).isEqualTo("RULE_BASED");
         assertThat(result.screenplay().scenes()).hasSize(3);
+        assertThat(result.screenplay().project().formatProfile().targetDurationMinutes()).isEqualTo(12);
+        assertThat(result.screenplay().project().formatProfile().structure()).contains("短剧");
         assertThat(result.screenplay().props())
                 .extracting("name")
                 .contains("名单");
@@ -41,6 +43,7 @@ class ConversionServiceTest {
                 .id();
         assertThat(result.screenplay().scenes().get(1).props()).contains(listPropId);
         assertThat(result.yaml()).contains("schemaVersion: \"1.0\"");
+        assertThat(result.yaml()).contains("targetDurationMinutes: 12");
         assertThat(result.validationMessages()).containsExactly("Schema 结构与跨引用语义检查通过");
 
         var edited = result.screenplay();

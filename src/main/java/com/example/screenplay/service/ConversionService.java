@@ -74,6 +74,18 @@ public class ConversionService {
     }
 
     private Screenplay normalizeEditedScreenplay(Screenplay screenplay) {
+        Screenplay.Project sourceProject = screenplay.project();
+        String format = sourceProject == null
+                ? "web_series"
+                : ScreenplayFormatProfiles.normalize(sourceProject.format());
+        Screenplay.Project project = new Screenplay.Project(
+                sourceProject == null ? "未命名作品" : sourceProject.title(),
+                sourceProject == null ? "zh-CN" : sourceProject.sourceLanguage(),
+                format,
+                sourceProject == null ? 3 : Math.max(sourceProject.sourceChapterCount(), 3),
+                sourceProject == null || sourceProject.formatProfile() == null
+                        ? ScreenplayFormatProfiles.profile(format)
+                        : sourceProject.formatProfile());
         List<Screenplay.Scene> sourceScenes = screenplay.scenes() == null
                 ? List.of()
                 : screenplay.scenes();
@@ -125,7 +137,7 @@ public class ConversionService {
 
         return new Screenplay(
                 screenplay.schemaVersion(),
-                screenplay.project(),
+                project,
                 screenplay.characters() == null ? List.of() : screenplay.characters(),
                 screenplay.locations() == null ? List.of() : screenplay.locations(),
                 screenplay.props() == null ? List.of() : screenplay.props(),
