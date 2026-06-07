@@ -3,6 +3,11 @@ spring:
     name: zhangmu-screenplay
   jackson:
     default-property-inclusion: non_null
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-store: true
 
 server:
   port: 8088
