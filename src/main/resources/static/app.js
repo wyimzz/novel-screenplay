@@ -18,6 +18,7 @@ const elements = {
   props: document.querySelector("#props"),
   sceneOutline: document.querySelector("#sceneOutline"),
   scenes: document.querySelector("#scenes"),
+  diagnostics: document.querySelector("#diagnostics"),
   output: document.querySelector("#output"),
   characterCount: document.querySelector("#characterCount"),
   locationCount: document.querySelector("#locationCount"),
@@ -244,6 +245,23 @@ function durationLabel(seconds) {
   return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分钟`;
 }
 
+function focusScene(index) {
+  switchTab("scenes");
+  window.setTimeout(() => {
+    const target = document.querySelector(`#scene-${index + 1}`);
+    const outlineButton = elements.sceneOutline.querySelector(
+      `[data-scene-target="scene-${index + 1}"]`
+    );
+    if (!target) return;
+    elements.sceneOutline.querySelectorAll(".scene-outline-item").forEach((item) => {
+      item.classList.toggle("active", item === outlineButton);
+    });
+    target.classList.add("scene-focus");
+    target.scrollIntoView({behavior: "smooth", block: "start"});
+    window.setTimeout(() => target.classList.remove("scene-focus"), 1600);
+  }, 0);
+}
+
 function renderScenes(screenplay) {
   const characters = screenplay.characters || [];
   const scenes = screenplay.scenes || [];
@@ -335,12 +353,184 @@ function renderScenes(screenplay) {
   }).join("");
   elements.sceneOutline.querySelectorAll("[data-scene-target]").forEach((button) => {
     button.addEventListener("click", () => {
-      const target = document.querySelector(`#${button.dataset.sceneTarget}`);
-      if (!target) return;
-      elements.sceneOutline.querySelectorAll(".scene-outline-item").forEach((item) => {
-        item.classList.toggle("active", item === button);
-      });
-      target.scrollIntoView({behavior: "smooth", block: "start"});
+      const index = Number(button.dataset.sceneTarget.replace("scene-", "")) - 1;
+      focusScene(index);
+    });
+  });
+}
+
+function analyzeScreenplay(screenplay) {
+  const scenes = screenplay.scenes || [];
+  const sourceChapterCount = screenplay.project?.sourceChapterCount || 0;
+  const expectedDuration = (screenplay.project?.formatProfile?.targetDurationMinutes || 0) * 60;
+  const issues = [];
+  let totalDuration = 0;
+  let totalBeats = 0;
+  let dialogueBeats = 0;
+  let actionBeats = 0;
+  let confidenceTotal = 0;
+  let score = 100;
+
+  const addIssue = (severity, title, detail, sceneIndex = null, deduction = 0) => {
+    issues.push({severity, title, detail, sceneIndex});
+    score -= deduction;
+  };
+
+  scenes.forEach((scene, index) => {
+    const beats = scene.beats || [];
+    const design = scene.formatDesign || formatDesignFallback(
+      screenplay.project?.format || "web_series",
+      index,
+      scenes.length
+    );
+    const dialogues = beats.filter((beat) => beat.type === "dialogue");
+    const actions = beats.filter((beat) => beat.type === "action");
+    const confidence = Number(scene.sourceFidelity?.confidence) || 0;
+    totalDuration += Number(design.estimatedDurationSeconds) || 0;
+    totalBeats += beats.length;
+    dialogueBeats += dialogues.length;
+    actionBeats += actions.length;
+    confidenceTotal += confidence;
+
+    if (!scene.heading?.location || scene.heading.location.includes("未指定")) {
+      addIssue("error", "地点尚未明确", "补充可执行的场景地点，便于后续统筹和制作。", index, 8);
+    }
+    if (!actions.length) {
+      addIssue("error", "缺少可见动作", "该场景只有表达内容，没有可拍摄或可表演的动作。", index, 7);
+    }
+    if (!dialogues.length) {
+      addIssue("warning", "场景没有对白", "确认该场是否有意采用纯动作叙事，或补充必要对白。", index, 3);
+    }
+    const missingSpeakers = dialogues.filter((beat) => !beat.characterId).length;
+    if (missingSpeakers) {
+      addIssue(
+        "error",
+        `${missingSpeakers} 句对白未指定人物`,
+        "为对白绑定人物 ID，避免导出后无法确认说话人。",
+        index,
+        Math.min(8, missingSpeakers * 3)
+      );
+    }
+    if (confidence < 0.65) {
+      addIssue("warning", "原文可信度偏低", `当前可信度为 ${Math.round(confidence * 100)}%。`, index, 6);
+    }
+    if (!scene.sourceFidelity?.evidence?.trim()) {
+      addIssue("error", "缺少原文依据", "补充对应原文证据，方便作者核对改编来源。", index, 7);
+    }
+    if (scene.sourceFidelity?.inventedContent) {
+      addIssue("info", "包含新增改编内容", "该场景含原文之外的桥接或扩展内容，请作者确认。", index, 1);
+    }
+  });
+
+  const coveredChapters = new Set(
+    scenes.flatMap((scene) => scene.sourceChapterIds || [])
+  );
+  for (let chapter = 1; chapter <= sourceChapterCount; chapter += 1) {
+    const chapterId = `chapter_${String(chapter).padStart(2, "0")}`;
+    if (!coveredChapters.has(chapterId)) {
+      addIssue("error", `${chapterId} 尚无场景`, "该原文章节没有进入最终剧本。", null, 10);
+    }
+  }
+
+  if (expectedDuration > 0 && totalDuration < expectedDuration * 0.6) {
+    addIssue(
+      "warning",
+      "预计时长明显不足",
+      `当前约 ${durationLabel(totalDuration)}，目标约 ${durationLabel(expectedDuration)}。`,
+      null,
+      8
+    );
+  } else if (expectedDuration > 0 && totalDuration > expectedDuration * 1.4) {
+    addIssue(
+      "warning",
+      "预计时长明显超出",
+      `当前约 ${durationLabel(totalDuration)}，目标约 ${durationLabel(expectedDuration)}。`,
+      null,
+      8
+    );
+  }
+
+  return {
+    score: Math.max(0, Math.round(score)),
+    totalDuration,
+    dialogueRatio: totalBeats ? Math.round(dialogueBeats / totalBeats * 100) : 0,
+    actionRatio: totalBeats ? Math.round(actionBeats / totalBeats * 100) : 0,
+    averageConfidence: scenes.length
+      ? Math.round(confidenceTotal / scenes.length * 100)
+      : 0,
+    issues
+  };
+}
+
+function renderDiagnostics(screenplay) {
+  const report = analyzeScreenplay(screenplay);
+  const scoreLevel = report.score >= 85
+    ? {label: "结构稳健", className: "good"}
+    : report.score >= 65
+      ? {label: "建议打磨", className: "warning"}
+      : {label: "需要修正", className: "danger"};
+  const errorCount = report.issues.filter((issue) => issue.severity === "error").length;
+  const warningCount = report.issues.filter((issue) => issue.severity === "warning").length;
+
+  elements.diagnostics.innerHTML = `
+    <section class="diagnostic-summary">
+      <div class="diagnostic-score ${scoreLevel.className}">
+        <strong>${report.score}</strong>
+        <span>剧本完整度</span>
+        <b>${scoreLevel.label}</b>
+      </div>
+      <div class="diagnostic-metrics">
+        ${renderMetric("预计总时长", durationLabel(report.totalDuration))}
+        ${renderMetric("对白占比", `${report.dialogueRatio}%`)}
+        ${renderMetric("动作占比", `${report.actionRatio}%`)}
+        ${renderMetric("平均原文可信度", `${report.averageConfidence}%`)}
+      </div>
+    </section>
+    <section class="diagnostic-balance">
+      <div>
+        <span>对白</span>
+        <div class="diagnostic-track"><i style="width:${report.dialogueRatio}%"></i></div>
+        <b>${report.dialogueRatio}%</b>
+      </div>
+      <div>
+        <span>动作</span>
+        <div class="diagnostic-track action"><i style="width:${report.actionRatio}%"></i></div>
+        <b>${report.actionRatio}%</b>
+      </div>
+    </section>
+    <div class="diagnostic-heading">
+      <div>
+        <h3>待处理问题</h3>
+        <p>严重问题 ${errorCount} 项，改进建议 ${warningCount} 项</p>
+      </div>
+      <span>${report.issues.length} 项</span>
+    </div>
+    <div class="diagnostic-issues">
+      ${report.issues.length ? report.issues.map((issue) => `
+        <button class="diagnostic-issue ${issue.severity}"
+                type="button"
+                ${issue.sceneIndex === null ? "disabled" : `data-diagnostic-scene="${issue.sceneIndex}"`}>
+          <span class="diagnostic-severity">${
+            issue.severity === "error" ? "严重" : issue.severity === "warning" ? "建议" : "确认"
+          }</span>
+          <span>
+            <strong>${escapeHtml(issue.title)}</strong>
+            <small>${escapeHtml(issue.detail)}</small>
+          </span>
+          ${issue.sceneIndex === null ? "" : `<b>场景 ${String(issue.sceneIndex + 1).padStart(2, "0")} →</b>`}
+        </button>
+      `).join("") : `
+        <div class="diagnostic-empty">
+          <strong>没有发现明显结构问题</strong>
+          <span>仍建议作者通读对白、节奏和改编取舍。</span>
+        </div>
+      `}
+    </div>
+  `;
+
+  elements.diagnostics.querySelectorAll("[data-diagnostic-scene]").forEach((button) => {
+    button.addEventListener("click", () => {
+      focusScene(Number(button.dataset.diagnosticScene));
     });
   });
 }
@@ -376,6 +566,7 @@ function renderPreview(screenplay, stage, message) {
   renderAsset(elements.locations, locations, "location");
   renderAsset(elements.props, props, "prop");
   renderScenes(screenplay);
+  renderDiagnostics(screenplay);
 
   elements.empty.classList.add("hidden");
   elements.result.classList.remove("hidden");
@@ -417,6 +608,7 @@ function renderResult(data) {
   renderAsset(elements.locations, screenplay.locations, "location");
   renderAsset(elements.props, screenplay.props, "prop");
   renderScenes(screenplay);
+  renderDiagnostics(screenplay);
 
   elements.empty.classList.add("hidden");
   elements.result.classList.remove("hidden");
