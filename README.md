@@ -66,7 +66,7 @@ cd F:\java\novel-screenplay
 .\mvnw.cmd spring-boot:run
 ```
 
-看到 `Started ScreenplayApplication` 后，浏览器访问：
+看到 `Started NovelScreenplayApplication` 后，浏览器访问：
 
 <http://localhost:8088/>
 
@@ -86,9 +86,9 @@ cd F:\java\novel-screenplay
 
 页面保存 AI 设置时会更新项目根目录中被 Git 忽略的 `.env`，不应把 API Key 提交到仓库。使用本地 Ollama 时，先启动 Ollama 并拉取所选模型，默认接口为 `http://localhost:11434/v1`。
 
-### 4. 使用 `.env` 启动任意 AI 服务
+### 4. 使用 `.env` 启动 AI 服务
 
-`.env` 不是 DeepSeek 专用配置。应用通过 OpenAI Chat Completions 兼容协议访问模型，只要修改 API 地址、Key 和模型 ID，就可以启动 DeepSeek、GLM、Qwen、Kimi、OpenAI、Ollama 或其他兼容服务。
+应用通过 OpenAI Chat Completions 兼容协议访问模型。在 `.env` 中填写所选服务商的 API 地址、Key 和模型 ID，即可启动 DeepSeek、GLM、Qwen、Kimi、OpenAI、Ollama 或其他兼容服务。
 
 先从示例文件创建本地配置：
 
@@ -105,13 +105,13 @@ powershell -ExecutionPolicy Bypass -File .\run-ai.ps1 -Port 8090
 
 此方式访问 <http://localhost:8090/>。`-Port` 可以改成其他未占用端口。
 
-GLM 配置示例：
+配置示例：
 
 ```dotenv
 SCREENPLAY_AI_ENABLED=true
-SCREENPLAY_AI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
-SCREENPLAY_AI_API_KEY=填写你自己的GLMKey
-SCREENPLAY_AI_MODEL=glm-4.5-air
+SCREENPLAY_AI_BASE_URL=https://api.deepseek.com
+SCREENPLAY_AI_API_KEY=填写对应服务商的APIKey
+SCREENPLAY_AI_MODEL=deepseek-v4-flash
 SCREENPLAY_AI_TIMEOUT_SECONDS=180
 ```
 
@@ -162,4 +162,5 @@ SCREENPLAY_AI_TIMEOUT_SECONDS=180
 - Schema 设计说明：`docs/SCREENPLAY_SCHEMA.md`
 - JSON Schema：`schema/screenplay.schema.json`
 - YAML 示例：`examples/example-screenplay.yaml`
+- Demo 视频讲解词：`docs/DEMO_SCRIPT.md`
 - 参赛提交清单：`docs/SUBMISSION_CHECKLIST.md`
