@@ -16,11 +16,41 @@ import java.util.regex.Pattern;
 @Component
 public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
 
-    private static final Pattern SPEAKER = Pattern.compile(
-            "([\\p{IsHan}]{2,4})(?:低声|大声|轻声|冷冷地|笑着|问|答|喊|说道|说|道)[：:]?[“\"]");
+    private static final String COMMON_SURNAMES =
+            "赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜"
+                    + "戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳"
+                    + "鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮卞齐康"
+                    + "伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成"
+                    + "戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童"
+                    + "颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍虞万支柯管卢莫经房"
+                    + "裘缪干解应宗丁宣邓郁单杭洪包诸左石崔吉龚程邢滑裴陆荣翁"
+                    + "荀羊甄曲封芮储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓"
+                    + "蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸"
+                    + "司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴胥能"
+                    + "苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍郤璩桑桂濮牛寿通边"
+                    + "扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎"
+                    + "戈廖庾终暨居衡步都耿满弘匡国文寇广禄阙东欧利蔚越夔隆师"
+                    + "巩厍聂晁勾敖融冷訾辛阚那简饶空曾毋沙乜养鞠须丰巢关蒯相"
+                    + "查后荆红游竺权逯盖益桓公";
+    private static final String PERSON_TOKEN =
+            "(?:欧阳|司马|上官|诸葛|夏侯|东方|皇甫|尉迟|公孙|慕容|司徒|令狐|宇文|长孙|司空|南宫"
+                    + "|[" + COMMON_SURNAMES + "])[\\p{IsHan}]{1,2}?";
+    private static final Pattern SPEAKER_NAME = Pattern.compile(
+            "(?:^|[。！？!?，,；;\\n])(" + PERSON_TOKEN + ")"
+                    + "(?=[^，。！？!?；;“”\"\\n]{0,12}(?:说道|说|问|喊|答|道|叫)[：:]?[“\"])",
+            Pattern.MULTILINE);
     private static final Pattern DIALOGUE = Pattern.compile("[“\"]([^”\"\\n]{2,120})[”\"]");
     private static final Pattern LOCATION = Pattern.compile(
             "(?:来到|走进|进入|回到|赶到|站在)([\\p{IsHan}]{2,10}(?:室|厅|店|馆|院|楼|房|街|站|场|园|门|办公室|咖啡馆|餐厅))");
+    private static final List<String> LOCATION_DICTIONARY = List.of(
+            "广场", "山崖", "树林", "房间", "大厅", "卧室", "客厅", "书房", "院子",
+            "街道", "办公室", "咖啡馆", "餐厅", "车站", "校园", "医院", "公园",
+            "酒吧", "酒店", "仓库", "天台", "码头", "机场", "教室", "会议室");
+    private static final Set<String> INVALID_CHARACTER_NAMES = Set.of(
+            "萧家", "林中", "林间", "林外", "王者", "王族", "主人", "人物", "老人",
+            "少年", "少女", "男子", "女子", "父亲", "母亲", "先生", "小姐");
+    private static final List<String> NAME_SUFFIXES = List.of(
+            "哥哥", "姐姐", "弟弟", "妹妹", "先生", "小姐", "少爷", "长老", "族长", "管家");
     private static final List<String> PROP_DICTIONARY = List.of(
             "名单", "钥匙", "照片", "文件", "档案", "手机", "项链",
             "戒指", "手表", "箱子", "笔记", "地图", "信");
@@ -116,10 +146,10 @@ public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
     private Map<String, String> discoverCharacters(List<Chapter> chapters) {
         Set<String> names = new LinkedHashSet<>();
         for (Chapter chapter : chapters) {
-            Matcher matcher = SPEAKER.matcher(chapter.content());
+            Matcher matcher = SPEAKER_NAME.matcher(chapter.content());
             while (matcher.find()) {
-                String candidate = matcher.group(1);
-                if (!candidate.endsWith("地") && !candidate.contains("时候")) {
+                String candidate = normalizeCharacterName(matcher.group(1));
+                if (isLikelyCharacterName(candidate)) {
                     names.add(candidate);
                 }
             }
@@ -138,6 +168,11 @@ public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
             Matcher matcher = LOCATION.matcher(chapter.content());
             while (matcher.find()) {
                 names.add(matcher.group(1));
+            }
+            for (String location : LOCATION_DICTIONARY) {
+                if (chapter.content().contains(location)) {
+                    names.add(location);
+                }
             }
         }
         Map<String, String> ids = new LinkedHashMap<>();
@@ -182,7 +217,9 @@ public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
                 if (!action.isBlank()) {
                     beats.add(beat(chapter, index++, "action", null, shorten(action, 180)));
                 }
-                String speaker = findSpeaker(text.substring(0, dialogueMatcher.start()), characterIds);
+                String prefix = text.substring(0, dialogueMatcher.start());
+                String suffix = text.substring(dialogueMatcher.end());
+                String speaker = findSpeaker(prefix, suffix, characterIds);
                 beats.add(beat(chapter, index++, "dialogue", speaker, dialogueMatcher.group(1).trim()));
                 cursor = dialogueMatcher.end();
             }
@@ -211,7 +248,7 @@ public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
                 text);
     }
 
-    private String findSpeaker(String prefix, Map<String, String> characterIds) {
+    private String findSpeaker(String prefix, String suffix, Map<String, String> characterIds) {
         String selected = null;
         int latest = -1;
         for (Map.Entry<String, String> entry : characterIds.entrySet()) {
@@ -221,7 +258,38 @@ public class RuleBasedScreenplayGenerator implements ScreenplayGenerator {
                 latest = position;
             }
         }
+        if (selected != null && prefix.length() - latest <= 40) {
+            return selected;
+        }
+        String nearbySuffix = suffix.substring(0, Math.min(suffix.length(), 30));
+        for (Map.Entry<String, String> entry : characterIds.entrySet()) {
+            if (nearbySuffix.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
         return selected;
+    }
+
+    private String normalizeCharacterName(String candidate) {
+        String normalized = candidate;
+        for (String suffix : NAME_SUFFIXES) {
+            if (normalized.endsWith(suffix) && normalized.length() > suffix.length()) {
+                normalized = normalized.substring(0, normalized.length() - suffix.length());
+            } else if (normalized.endsWith(suffix.substring(0, 1)) && normalized.length() > 2) {
+                normalized = normalized.substring(0, normalized.length() - 1);
+            }
+        }
+        return normalized;
+    }
+
+    private boolean isLikelyCharacterName(String candidate) {
+        return candidate.length() >= 2
+                && candidate.length() <= 4
+                && !INVALID_CHARACTER_NAMES.contains(candidate)
+                && !candidate.endsWith("家")
+                && !candidate.endsWith("城")
+                && !candidate.endsWith("国")
+                && !candidate.endsWith("族");
     }
 
     private String firstAppearance(String name, List<Chapter> chapters) {

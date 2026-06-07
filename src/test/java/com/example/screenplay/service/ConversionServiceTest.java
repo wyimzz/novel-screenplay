@@ -36,6 +36,17 @@ class ConversionServiceTest {
         assertThat(result.screenplay().props())
                 .extracting("name")
                 .contains("名单");
+        assertThat(result.screenplay().characters())
+                .extracting("name")
+                .contains("林舟", "苏禾")
+                .doesNotContain("说道", "认真的", "微笑");
+        assertThat(result.screenplay().locations())
+                .extracting("name")
+                .contains("旧城咖啡馆", "档案室", "废弃钟楼");
+        assertThat(result.screenplay().scenes().getFirst().beats())
+                .filteredOn(beat -> beat.type().equals("dialogue"))
+                .extracting("characterId")
+                .doesNotContainNull();
         String listPropId = result.screenplay().props().stream()
                 .filter(prop -> prop.name().equals("名单"))
                 .findFirst()
