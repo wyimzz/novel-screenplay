@@ -141,7 +141,7 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
         LOGGER.info("AI detailed chapter adaptation started: model={}, chapters={}",
                 settings.model(), chapters.size());
 
-        int concurrency = Math.min(3, chapters.size());
+        int concurrency = chapterConcurrency(settings.baseUrl(), chapters.size());
         progress.accept(new GenerationProgress("scenes", "正在生成各章动作与对白", 42));
         List<ChapterDraft> completedDrafts = new ArrayList<>();
 
@@ -273,8 +273,8 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
         request.put("model", settings.model());
         request.put("temperature", temperature);
         request.put("max_tokens", maxTokens);
+        settingsService.addProviderOptions(request, settings.baseUrl(), settings.model());
         if (settings.baseUrl().toLowerCase().contains("deepseek")) {
-            request.put("thinking", Map.of("type", "disabled"));
             request.put("response_format", Map.of("type", "json_object"));
         }
         request.put("messages", List.of(
@@ -290,21 +290,62 @@ public class AiScreenplayGenerator implements ScreenplayGenerator {
         if (settings.apiKey() != null && !settings.apiKey().isBlank()) {
             httpRequest.header("Authorization", "Bearer " + settings.apiKey());
         }
-        HttpResponse<String> response = httpClient.send(
-                httpRequest.build(),
-                HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(httpRequest);
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             String message = objectMapper.readTree(response.body()).path("error").path("message").asText();
             throw new IllegalStateException(
                     message.isBlank() ? "AI 请求失败，HTTP " + response.statusCode() : "AI 请求失败：" + message);
         }
 
-        String content = objectMapper.readTree(response.body())
-                .path("choices").path(0).path("message").path("content").asText();
+        JsonNode responseRoot = objectMapper.readTree(response.body());
+        JsonNode choice = responseRoot.path("choices").path(0);
+        JsonNode messageNode = choice.path("message");
+        String content = messageNode.path("content").asText();
         if (content.isBlank()) {
-            throw new IllegalStateException("AI 返回内容为空");
+            String finishReason = choice.path("finish_reason").asText("unknown");
+            int reasoningLength = messageNode.path("reasoning_content").asText().length();
+            throw new IllegalStateException(
+                    "AI 返回内容为空（finish_reason=%s，reasoning_length=%d）。"
+                            .formatted(finishReason, reasoningLength)
+                            + "请检查模型是否启用了深度思考，或改用支持关闭 Thinking 的模型。");
         }
         return content;
+    }
+
+    int chapterConcurrency(String baseUrl, int chapterCount) {
+        String value = baseUrl == null ? "" : baseUrl.toLowerCase();
+        return value.contains("bigmodel.cn") ? 1 : Math.min(3, chapterCount);
+    }
+
+    private HttpResponse<String> sendWithRetry(HttpRequest.Builder requestBuilder)
+            throws IOException, InterruptedException {
+        HttpResponse<String> response = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            response = httpClient.send(
+                    requestBuilder.build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 429 && response.statusCode() != 503) {
+                return response;
+            }
+            if (attempt < 3) {
+                long delaySeconds = response.headers()
+                        .firstValue("Retry-After")
+                        .map(this::parseRetryDelay)
+                        .orElse((long) attempt * 2);
+                LOGGER.warn("AI request rate limited: status={}, retryIn={}s, attempt={}/3",
+                        response.statusCode(), delaySeconds, attempt);
+                Thread.sleep(Math.min(delaySeconds, 10) * 1000);
+            }
+        }
+        return response;
+    }
+
+    private long parseRetryDelay(String value) {
+        try {
+            return Math.max(1, Long.parseLong(value));
+        } catch (NumberFormatException ignored) {
+            return 2;
+        }
     }
 
     private String entityExtractionPrompt() {

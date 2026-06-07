@@ -5,6 +5,9 @@ import com.example.screenplay.model.AiSettingsRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AiSettingsServiceTest {
@@ -69,5 +72,21 @@ class AiSettingsServiceTest {
         assertThat(result.success()).isFalse();
         assertThat(result.latencyMs()).isZero();
         assertThat(result.message()).contains("离线模式");
+    }
+
+    @Test
+    void disablesThinkingForZhipuModels() {
+        AiSettingsService service = new AiSettingsService(
+                new AiModelProperties(false, "https://api.deepseek.com", "", "deepseek-chat", 30),
+                new ObjectMapper(),
+                false);
+        Map<String, Object> payload = new LinkedHashMap<>();
+
+        service.addProviderOptions(
+                payload,
+                "https://open.bigmodel.cn/api/paas/v4",
+                "glm-5");
+
+        assertThat(payload).containsEntry("thinking", Map.of("type", "disabled"));
     }
 }

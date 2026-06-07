@@ -10,6 +10,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AiScreenplayGeneratorTest {
 
     @Test
+    void usesSerialChapterGenerationForZhipu() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AiSettingsService settingsService = new AiSettingsService(
+                new AiModelProperties(false, "https://api.deepseek.com", "", "deepseek-chat", 30),
+                objectMapper);
+        AiScreenplayGenerator generator = new AiScreenplayGenerator(settingsService, objectMapper);
+
+        assertThat(generator.chapterConcurrency(
+                "https://open.bigmodel.cn/api/paas/v4",
+                5)).isEqualTo(1);
+        assertThat(generator.chapterConcurrency(
+                "https://api.deepseek.com",
+                5)).isEqualTo(3);
+    }
+
+    @Test
     void repairsTextContinuityIntoSceneReferences() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         AiSettingsService settingsService = new AiSettingsService(

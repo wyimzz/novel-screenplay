@@ -208,10 +208,14 @@ public class AiSettingsService {
         return "custom";
     }
 
-    private void addProviderOptions(Map<String, Object> payload, String baseUrl, String model) {
-        if (detectProviderId(baseUrl).equals("deepseek")
+    void addProviderOptions(Map<String, Object> payload, String baseUrl, String model) {
+        String providerId = detectProviderId(baseUrl);
+        if (providerId.equals("deepseek")
                 && model != null
                 && model.toLowerCase().startsWith("deepseek")) {
+            payload.put("thinking", Map.of("type", "disabled"));
+        }
+        if (providerId.equals("zhipu")) {
             payload.put("thinking", Map.of("type", "disabled"));
         }
     }
