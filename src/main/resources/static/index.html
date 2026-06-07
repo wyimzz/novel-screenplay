@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>章幕 - AI 小说转剧本工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260607-3">
+  <link rel="stylesheet" href="/styles.css?v=20260607-4">
 </head>
 <body>
 <header class="app-header">
@@ -38,7 +41,8 @@
     <div class="fields">
       <label>
         <span>作品名称</span>
-        <input id="title" value="" placeholder="输入作品名称" autocomplete="off">
+        <input id="projectNameInput" value="" placeholder="输入作品名称"
+               autocomplete="new-password" data-form-type="other">
       </label>
       <label>
         <span>剧本形式</span>
@@ -338,6 +342,6 @@
   </section>
 </div>
 
-<script src="/app.js?v=20260607-3"></script>
+<script src="/app.js?v=20260607-4"></script>
 </body>
 </html>

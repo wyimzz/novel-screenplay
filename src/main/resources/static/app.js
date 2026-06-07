@@ -1,5 +1,5 @@
 const elements = {
-  title: document.querySelector("#title"),
+  title: document.querySelector("#projectNameInput"),
   format: document.querySelector("#format"),
   content: document.querySelector("#content"),
   convert: document.querySelector("#convertBtn"),
@@ -24,6 +24,8 @@ const elements = {
   locationCount: document.querySelector("#locationCount"),
   propCount: document.querySelector("#propCount")
 };
+
+elements.title.value = "";
 
 const editorElements = {
   dialog: document.querySelector("#editorDialog"),
