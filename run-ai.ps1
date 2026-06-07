@@ -9,7 +9,7 @@ $envFile = Join-Path $projectRoot ".env"
 $jarFile = Join-Path $projectRoot "target\novel-screenplay-0.0.1-SNAPSHOT.jar"
 
 if (-not (Test-Path -LiteralPath $envFile)) {
-    throw "Missing .env file: $envFile"
+    throw "Missing .env file: $envFile. Copy .env.example to .env and fill in your provider settings."
 }
 
 Get-Content -LiteralPath $envFile -Encoding UTF8 |
@@ -25,6 +25,7 @@ if (-not (Test-Path -LiteralPath $jarFile)) {
     throw "Application JAR is missing. Run .\mvnw.cmd package first."
 }
 
-Write-Host "Starting ZhangMu with DeepSeek on http://localhost:$Port"
+Write-Host "Starting ZhangMu AI workspace on http://localhost:$Port"
+Write-Host "AI endpoint: $env:SCREENPLAY_AI_BASE_URL"
 Write-Host "AI model: $env:SCREENPLAY_AI_MODEL"
 & java -jar $jarFile "--server.port=$Port"
