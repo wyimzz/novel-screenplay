@@ -71,6 +71,8 @@ cd F:\java\novel-screenplay
 <http://localhost:8088/>
 
 默认未配置 API Key 时使用离线规则模式，可以直接载入示例、体验结构生成和编辑器。
+直接运行 JAR 或 `spring-boot:run` 时默认保持离线，不会自动读取项目根目录的 `.env`。
+需要固定云模型配置时，使用 `run-ai.ps1`；也可以启动后在页面“AI 设置”中临时启用。
 
 ### 3. 使用真实 AI
 
@@ -134,6 +136,7 @@ SCREENPLAY_AI_TIMEOUT_SECONDS=180
 - AI 分阶段生成：Story Bible -> 全书改编蓝图 -> 分章详细剧本 -> 全局合并
 - AI 服务商切换：DeepSeek、智谱 GLM、通义千问、Moonshot/Kimi、OpenAI、Ollama 与自定义兼容接口
 - 服务商内模型切换：DeepSeek V4 Flash/Pro、GLM 多型号等使用明确下拉框，也支持自定义模型 ID
+- 改编过程中切换服务商、模型或离线模式时，后台任务会立即取消并提示重新改编
 - GLM 长文本生成自动关闭 Thinking，并采用串行分章与限流重试，避免推理耗尽输出和并发 429
 - 页眉实时显示当前 AI 实测响应延迟，并按快、一般、慢区分连接状态，支持手动重新测速
 - 场景级媒介结构：电影三幕与视听设计、电视剧 A/B 线与幕尾、短剧秒级钩子反转、舞台剧幕场与演员调度

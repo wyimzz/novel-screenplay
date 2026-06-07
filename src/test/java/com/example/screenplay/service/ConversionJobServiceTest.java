@@ -108,4 +108,58 @@ class ConversionJobServiceTest {
         assertThat(running.result()).isNull();
         assertThat(running.stage()).isEqualTo("assets");
     }
+
+    @Test
+    void cancelsRunningConversion() throws Exception {
+        ScreenplayGenerator slowGenerator = new ScreenplayGenerator() {
+            @Override
+            public Screenplay generate(String title, String format, List<com.example.screenplay.model.Chapter> chapters) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Screenplay generate(
+                    String title,
+                    String format,
+                    List<com.example.screenplay.model.Chapter> chapters,
+                    java.util.function.Consumer<GenerationProgress> progress
+            ) {
+                progress.accept(new GenerationProgress("assets", "正在分析", 15));
+                try {
+                    Thread.sleep(10_000);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("任务被中断", exception);
+                }
+                return new RuleBasedScreenplayGenerator().generate(title, format, chapters);
+            }
+
+            @Override
+            public String mode() {
+                return "TEST";
+            }
+        };
+        ConversionJobService jobs = new ConversionJobService(new ConversionService(
+                new ChapterParser(),
+                slowGenerator,
+                new ScreenplayValidator()));
+        ConversionJob started = jobs.start(new ConversionRequest(
+                "取消测试",
+                """
+                        第一章 开始
+                        一。
+                        第二章 继续
+                        二。
+                        第三章 结束
+                        三。
+                        """,
+                "web_series"));
+
+        ConversionJob canceled = jobs.cancel(started.id());
+        Thread.sleep(30);
+
+        assertThat(canceled.status()).isEqualTo("CANCELED");
+        assertThat(jobs.get(started.id()).status()).isEqualTo("CANCELED");
+        assertThat(jobs.get(started.id()).error()).contains("重新开始改编");
+    }
 }
