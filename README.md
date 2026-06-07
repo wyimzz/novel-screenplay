@@ -4,9 +4,7 @@
 
 ## Demo 视频
 
-> 提交前将此处替换为可公开访问的 Bilibili 或网盘视频链接，并确认无需登录即可播放。
-
-- Demo 视频：`待上传`
+- Demo 视频：https://www.bilibili.com/video/BV1rjEh6qEe3/?spm_id_from=333.1387.upload.video_card.click&vd_source=8125daedf4a3338f2ff5d42ac8393533
 - 在线仓库：<https://github.com/wyimzz/novel-screenplay>
 
 ## 核心流程
