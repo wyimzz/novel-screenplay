@@ -39,7 +39,7 @@
 | Jackson Databind / YAML | JSON 响应归一化与 YAML 导出 |
 | Jakarta Validation | 请求参数校验 |
 | JUnit 5 / AssertJ | 自动化测试 |
-| DeepSeek OpenAI-compatible API | 小说分析与剧本生成 |
+| OpenAI Chat Completions 兼容 API | 接入 DeepSeek、GLM、Qwen、Kimi、OpenAI、Ollama 等模型 |
 
 第三方依赖版本以 `pom.xml` 为准。API Key 不进入 Git，保存在被 `.gitignore` 排除的 `.env` 中。
 
@@ -82,42 +82,56 @@ cd F:\java\novel-screenplay
 4. 点击连接测试，测试成功后保存设置。
 5. 输入至少 3 个章节，再点击“开始改编”。
 
-AI 设置保存在本机 `data/` 目录，不应把 API Key 提交到 Git。使用本地 Ollama 时，先启动 Ollama 并拉取所选模型，默认接口为 `http://localhost:11434/v1`。
+页面保存 AI 设置时会更新项目根目录中被 Git 忽略的 `.env`，不应把 API Key 提交到仓库。使用本地 Ollama 时，先启动 Ollama 并拉取所选模型，默认接口为 `http://localhost:11434/v1`。
 
-### 4. 使用 `.env` 启动 DeepSeek
+### 4. 使用 `.env` 启动任意 AI 服务
 
-也可以在项目根目录创建不提交到 Git 的 `.env` 文件：
+`.env` 不是 DeepSeek 专用配置。应用通过 OpenAI Chat Completions 兼容协议访问模型，只要修改 API 地址、Key 和模型 ID，就可以启动 DeepSeek、GLM、Qwen、Kimi、OpenAI、Ollama 或其他兼容服务。
 
-```dotenv
-SCREENPLAY_AI_ENABLED=true
-SCREENPLAY_AI_BASE_URL=https://api.deepseek.com
-SCREENPLAY_AI_API_KEY=填写你自己的APIKey
-SCREENPLAY_AI_MODEL=deepseek-chat
-SCREENPLAY_AI_TIMEOUT_SECONDS=180
+先从示例文件创建本地配置：
+
+```powershell
+Copy-Item .env.example .env
 ```
 
-先构建，再用脚本启动：
+编辑 `.env` 后构建并启动：
 
 ```powershell
 .\mvnw.cmd clean package
-powershell -ExecutionPolicy Bypass -File .\run-deepseek.ps1 -Port 8090
+powershell -ExecutionPolicy Bypass -File .\run-ai.ps1 -Port 8090
 ```
 
 此方式访问 <http://localhost:8090/>。`-Port` 可以改成其他未占用端口。
+
+GLM 配置示例：
+
+```dotenv
+SCREENPLAY_AI_ENABLED=true
+SCREENPLAY_AI_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+SCREENPLAY_AI_API_KEY=填写你自己的GLMKey
+SCREENPLAY_AI_MODEL=glm-4.5-air
+SCREENPLAY_AI_TIMEOUT_SECONDS=180
+```
+
+页面右上角的“AI 设置”和 `.env` 使用同一套运行配置：
+
+- 页面设置适合在浏览器里切换并测试服务商。
+- `.env` 适合固定部署配置或通过脚本启动。
+- `run-ai.ps1` 只负责加载 `.env`，不会限制模型服务商。
 
 ### 5. 常见启动问题
 
 - `JAVA_HOME` 或 Java 版本错误：安装 JDK 21，重新打开 PowerShell 后检查 `java -version`。
 - `8088` 端口被占用：执行 `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--server.port=8090`，然后访问 `http://localhost:8090/`。
 - 页面能打开但 AI 不工作：进入“AI 设置”检查服务商、模型、API 地址和 Key，并先执行连接测试。
-- DeepSeek 请求较慢：长文本会分为故事圣经、全书蓝图和逐章剧本多个阶段；页面会在各阶段完成后渐进展示结果。
+- AI 请求较慢：长文本会分为故事圣经、全书蓝图和逐章剧本多个阶段；页面会在各阶段完成后渐进展示结果。
 - 脚本提示缺少 `.env`：按上面的模板在项目根目录创建 `.env`，并确认文件名不是 `.env.txt`。
 
 ## 当前能力
 
 - 识别“第一章”和 `Chapter 1` 等章节标题
 - 强制至少 3 章输入
-- DeepSeek 分阶段生成：Story Bible -> 全书改编蓝图 -> 分章详细剧本 -> 全局合并
+- AI 分阶段生成：Story Bible -> 全书改编蓝图 -> 分章详细剧本 -> 全局合并
 - AI 服务商切换：DeepSeek、智谱 GLM、通义千问、Moonshot/Kimi、OpenAI、Ollama 与自定义兼容接口
 - 服务商内模型切换：DeepSeek V4 Flash/Pro、GLM 多型号等使用明确下拉框，也支持自定义模型 ID
 - 页眉实时显示当前 AI 实测响应延迟，并按快、一般、慢区分连接状态，支持手动重新测速
