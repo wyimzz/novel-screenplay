@@ -373,10 +373,33 @@ function analyzeScreenplay(screenplay) {
   let actionBeats = 0;
   let confidenceTotal = 0;
   let score = 100;
+  const deductionTotals = {};
+  const deductionCaps = {
+    location: 12,
+    action: 14,
+    dialogue: 6,
+    speaker: 12,
+    confidence: 6,
+    evidence: 12,
+    invented: 3,
+    coverage: 30,
+    duration: 8
+  };
 
-  const addIssue = (severity, title, detail, sceneIndex = null, deduction = 0) => {
+  const addIssue = (
+    severity,
+    title,
+    detail,
+    sceneIndex = null,
+    deduction = 0,
+    category = "general"
+  ) => {
     issues.push({severity, title, detail, sceneIndex});
-    score -= deduction;
+    const used = deductionTotals[category] || 0;
+    const cap = deductionCaps[category] ?? deduction;
+    const applied = Math.max(0, Math.min(deduction, cap - used));
+    deductionTotals[category] = used + applied;
+    score -= applied;
   };
 
   scenes.forEach((scene, index) => {
@@ -396,13 +419,13 @@ function analyzeScreenplay(screenplay) {
     confidenceTotal += confidence;
 
     if (!scene.heading?.location || scene.heading.location.includes("未指定")) {
-      addIssue("error", "地点尚未明确", "补充可执行的场景地点，便于后续统筹和制作。", index, 8);
+      addIssue("error", "地点尚未明确", "补充可执行的场景地点，便于后续统筹和制作。", index, 8, "location");
     }
     if (!actions.length) {
-      addIssue("error", "缺少可见动作", "该场景只有表达内容，没有可拍摄或可表演的动作。", index, 7);
+      addIssue("error", "缺少可见动作", "该场景只有表达内容，没有可拍摄或可表演的动作。", index, 7, "action");
     }
     if (!dialogues.length) {
-      addIssue("warning", "场景没有对白", "确认该场是否有意采用纯动作叙事，或补充必要对白。", index, 3);
+      addIssue("warning", "场景没有对白", "确认该场是否有意采用纯动作叙事，或补充必要对白。", index, 3, "dialogue");
     }
     const missingSpeakers = dialogues.filter((beat) => !beat.characterId).length;
     if (missingSpeakers) {
@@ -411,17 +434,25 @@ function analyzeScreenplay(screenplay) {
         `${missingSpeakers} 句对白未指定人物`,
         "为对白绑定人物 ID，避免导出后无法确认说话人。",
         index,
-        Math.min(8, missingSpeakers * 3)
+        Math.min(8, missingSpeakers * 3),
+        "speaker"
       );
     }
     if (confidence < 0.65) {
-      addIssue("warning", "原文可信度偏低", `当前可信度为 ${Math.round(confidence * 100)}%。`, index, 6);
+      addIssue(
+        "warning",
+        "原文依据建议复核",
+        `当前可信度为 ${Math.round(confidence * 100)}%，请结合原文证据人工确认。`,
+        index,
+        2,
+        "confidence"
+      );
     }
     if (!scene.sourceFidelity?.evidence?.trim()) {
-      addIssue("error", "缺少原文依据", "补充对应原文证据，方便作者核对改编来源。", index, 7);
+      addIssue("error", "缺少原文依据", "补充对应原文证据，方便作者核对改编来源。", index, 7, "evidence");
     }
     if (scene.sourceFidelity?.inventedContent) {
-      addIssue("info", "包含新增改编内容", "该场景含原文之外的桥接或扩展内容，请作者确认。", index, 1);
+      addIssue("info", "包含新增改编内容", "该场景含原文之外的桥接或扩展内容，请作者确认。", index, 1, "invented");
     }
   });
 
@@ -431,7 +462,7 @@ function analyzeScreenplay(screenplay) {
   for (let chapter = 1; chapter <= sourceChapterCount; chapter += 1) {
     const chapterId = `chapter_${String(chapter).padStart(2, "0")}`;
     if (!coveredChapters.has(chapterId)) {
-      addIssue("error", `${chapterId} 尚无场景`, "该原文章节没有进入最终剧本。", null, 10);
+      addIssue("error", `${chapterId} 尚无场景`, "该原文章节没有进入最终剧本。", null, 10, "coverage");
     }
   }
 
@@ -441,7 +472,8 @@ function analyzeScreenplay(screenplay) {
       "预计时长明显不足",
       `当前约 ${durationLabel(totalDuration)}，目标约 ${durationLabel(expectedDuration)}。`,
       null,
-      8
+      8,
+      "duration"
     );
   } else if (expectedDuration > 0 && totalDuration > expectedDuration * 1.4) {
     addIssue(
@@ -449,7 +481,8 @@ function analyzeScreenplay(screenplay) {
       "预计时长明显超出",
       `当前约 ${durationLabel(totalDuration)}，目标约 ${durationLabel(expectedDuration)}。`,
       null,
-      8
+      8,
+      "duration"
     );
   }
 
