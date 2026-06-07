@@ -1065,7 +1065,11 @@ function updateRuntimeStatus(settings) {
   const active = settings.activeMode === "AI";
   settingsElements.runtimeStatus.classList.toggle("ai-active", active);
   settingsElements.runtimeStatus.querySelector("b").textContent = active
-    ? `${settings.provider} · ${settings.model}`
+    ? `${settings.provider} · ${settings.model} · ${
+        settings.providerId === "ollama"
+          ? "本地服务"
+          : settings.apiKeyConfigured ? "已保存 Key" : "免 Key"
+      }`
     : "离线规则模式";
   settingsElements.latency.disabled = !active;
   if (!active) updateLatencyStatus(null, "离线");

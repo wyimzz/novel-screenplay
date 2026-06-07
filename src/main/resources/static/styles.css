@@ -299,6 +299,26 @@ input:focus, select:focus, textarea:focus {
 
 .empty-state strong { color: var(--ink); font-size: 16px; }
 .empty-state p { max-width: 390px; margin: 9px 0 0; font-size: 13px; line-height: 1.7; }
+.empty-capabilities {
+  max-width: 460px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 18px;
+}
+.empty-capabilities span {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-size: 10px;
+}
+.empty-capabilities .diagnostic-preview {
+  border-color: #d9bd74;
+  background: #faf6e8;
+  color: #745d1c;
+}
 .hidden { display: none !important; }
 
 .validation {

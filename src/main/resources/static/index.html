@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>章幕 - AI 小说转剧本工作台</title>
-  <link rel="stylesheet" href="/styles.css?v=20260607-1">
+  <link rel="stylesheet" href="/styles.css?v=20260607-2">
 </head>
 <body>
 <header class="app-header">
@@ -38,7 +38,7 @@
     <div class="fields">
       <label>
         <span>作品名称</span>
-        <input id="title" value="雾城来信" placeholder="输入作品名称">
+        <input id="title" value="" placeholder="输入作品名称">
       </label>
       <label>
         <span>剧本形式</span>
@@ -93,6 +93,12 @@
       <div class="empty-symbol">三幕</div>
       <strong>从小说建立可编辑的剧本结构</strong>
       <p>系统会先建立故事圣经和全书改编蓝图，再生成动作、对白与符合 Schema 的 YAML。</p>
+      <div class="empty-capabilities" aria-label="生成结果视图">
+        <span>故事圣经</span>
+        <span>场景拆解</span>
+        <span class="diagnostic-preview">剧本诊断 · 生成后开放</span>
+        <span>YAML</span>
+      </div>
     </div>
 
     <div id="resultArea" class="result-area hidden">
@@ -332,6 +338,6 @@
   </section>
 </div>
 
-<script src="/app.js?v=20260607-1"></script>
+<script src="/app.js?v=20260607-2"></script>
 </body>
 </html>

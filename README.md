@@ -134,6 +134,7 @@ SCREENPLAY_AI_TIMEOUT_SECONDS=180
 - AI 分阶段生成：Story Bible -> 全书改编蓝图 -> 分章详细剧本 -> 全局合并
 - AI 服务商切换：DeepSeek、智谱 GLM、通义千问、Moonshot/Kimi、OpenAI、Ollama 与自定义兼容接口
 - 服务商内模型切换：DeepSeek V4 Flash/Pro、GLM 多型号等使用明确下拉框，也支持自定义模型 ID
+- GLM 长文本生成自动关闭 Thinking，并采用串行分章与限流重试，避免推理耗尽输出和并发 429
 - 页眉实时显示当前 AI 实测响应延迟，并按快、一般、慢区分连接状态，支持手动重新测速
 - 场景级媒介结构：电影三幕与视听设计、电视剧 A/B 线与幕尾、短剧秒级钩子反转、舞台剧幕场与演员调度
 - 后台生成任务与真实阶段进度，刷新页面请求不会长期占用单个 HTTP 连接
