@@ -125,6 +125,7 @@ let selectedSceneIndex = 0;
 let activeEditorSection = "characters";
 let previewVisible = false;
 let previewSceneCount = 0;
+let currentJobId = null;
 
 function countChapters() {
   const pattern = /^\s*(第[零〇一二两三四五六七八九十百千0-9]+章|Chapter\s+\d+)/gmi;
@@ -1196,6 +1197,22 @@ async function saveAiSettings() {
   }
 }
 
+async function cancelCurrentConversion(message = "AI 已切换，需要重新开始改编") {
+  const jobId = currentJobId;
+  if (!jobId) return;
+  currentJobId = null;
+  try {
+    await fetch(`/api/screenplays/jobs/${encodeURIComponent(jobId)}`, {
+      method: "DELETE"
+    });
+  } catch (error) {
+    console.warn("取消改编任务失败", error);
+  }
+  elements.convert.disabled = false;
+  elements.convert.textContent = "开始改编";
+  showError(message);
+}
+
 async function convertNovel() {
   elements.convert.disabled = true;
   elements.convert.textContent = "正在创建任务…";
@@ -1221,6 +1238,7 @@ async function convertNovel() {
     if (!response.ok) {
       throw new Error(job.message || "创建生成任务失败");
     }
+    currentJobId = job.id;
     await waitForConversionJob(job.id);
   } catch (error) {
     showError(error.message);
@@ -1237,6 +1255,7 @@ async function waitForConversionJob(jobId) {
       cache: "no-store"
     });
     const job = await response.json();
+    if (currentJobId !== jobId) return;
     if (!response.ok) {
       throw new Error(job.message || "读取生成进度失败");
     }
@@ -1250,10 +1269,16 @@ async function waitForConversionJob(jobId) {
       renderPreview(job.preview, job.stage, job.message);
     }
     if (job.status === "COMPLETED") {
+      currentJobId = null;
       renderResult(job.result);
       return;
     }
+    if (job.status === "CANCELED") {
+      currentJobId = null;
+      throw new Error(job.error || "改编已取消，请重新开始");
+    }
     if (job.status === "FAILED") {
+      currentJobId = null;
       throw new Error(job.error || "AI 生成失败");
     }
     await new Promise((resolve) => window.setTimeout(resolve, 1000));
@@ -1269,6 +1294,9 @@ function switchTab(name) {
 }
 
 elements.content.addEventListener("input", updateChapterHint);
+window.addEventListener("pageshow", () => {
+  elements.title.value = "";
+});
 elements.sample.addEventListener("click", async () => {
   const originalLabel = elements.sample.textContent;
   elements.sample.disabled = true;
@@ -1302,16 +1330,27 @@ document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => switchTab(tab.dataset.tab));
 });
 document.querySelectorAll(".mode-option").forEach((option) => {
-  option.addEventListener("click", () => setAiMode(option.dataset.mode === "deepseek"));
+  option.addEventListener("click", async () => {
+    const nextEnabled = option.dataset.mode === "deepseek";
+    if (nextEnabled !== aiEnabled) {
+      await cancelCurrentConversion();
+    }
+    setAiMode(nextEnabled);
+  });
 });
 settingsElements.provider.addEventListener("change", () => {
+  cancelCurrentConversion();
   renderModelOptions(settingsElements.provider.value, "", true);
   settingsElements.apiKey.value = "";
   settingsElements.apiKeyHint.textContent = settingsElements.provider.value === "ollama"
     ? "本地接口无需 Key"
     : "切换服务商后请输入对应 API Key";
 });
-settingsElements.modelPreset.addEventListener("change", updateCustomModelVisibility);
+settingsElements.modelPreset.addEventListener("change", () => {
+  cancelCurrentConversion();
+  updateCustomModelVisibility();
+});
+settingsElements.model.addEventListener("change", () => cancelCurrentConversion());
 settingsElements.open.addEventListener("click", () => {
   settingsElements.dialog.classList.remove("hidden");
   settingsElements.result.classList.add("hidden");
