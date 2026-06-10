@@ -22,12 +22,6 @@
 
 本项目实现了 Java 后端、模型接入、全书改编蓝图、分章并行生成、响应归一化、异步任务、YAML Schema、语义校验、渐进式预览和浏览器结构编辑器。针对小说转剧本场景，重点增强了跨章节连续性、不同剧本形式的场景结构、原文证据追溯、模型异常响应修复和作者可继续编辑的结构化交付。
 
-参考项目：
-
-- [Alibaba LumenX Studio](https://github.com/alibaba/lumenx)：参考内容分析、故事资产提取和分阶段创作流程。
-- [StoryToolkitAI](https://github.com/octimot/StoryToolkitAI)：参考 AI 辅助故事编辑、转录内容管理和创作工具整合方式。
-- [Beat](https://github.com/lmparppei/Beat)：参考专业剧本场景组织、结构导航和作者编辑体验。
-- [Trelby](https://github.com/trelby/trelby)：参考开源剧本编辑器的格式化写作与剧本工作流。
 
 主要第三方依赖：
 
